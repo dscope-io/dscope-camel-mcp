@@ -13,11 +13,10 @@ This mini-project hosts both HTTP and WebSocket-facing MCP services with the Cam
 ```bash
 # from the repository root
 mvn clean install
-cd samples/mcp-service
-mvn compile exec:java
+mvn -f samples/mcp-service/pom.xml exec:java
 ```
 
-The command above now boots both the HTTP routes (`http://localhost:8080`) and the WebSocket helpers (`ws://localhost:8090/mcp`) by loading `mcp-service.yaml` and `mcp-service-ws.yaml` together. Add `-Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml` if you only need the WebSocket helpers.
+The exec goal boots both the HTTP routes (`http://localhost:8080`) and the WebSocket helpers (`ws://localhost:8090/mcp`) by loading `mcp-service.yaml` and `mcp-service-ws.yaml` together. Add `-Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml` if you only need the WebSocket helpers.
 
 ## OpenAPI descriptor
 
