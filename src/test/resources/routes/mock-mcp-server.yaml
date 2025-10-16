@@ -1,0 +1,56 @@
+# Mock MCP Server Route for local testing
+- route:
+    id: mock-mcp-server
+    from:
+      uri: "undertow:http://0.0.0.0:8080/mcp?httpMethodRestrict=POST"
+      steps:
+        - unmarshal:
+            json:
+              library: Jackson
+        - choice:
+            when:
+              - simple: "${body[method]} == 'initialize'"
+                steps:
+                  - setBody:
+                      constant: |
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 1,
+                          "result": {
+                            "protocolVersion": "2025-06-18",
+                            "serverInfo": { "name": "mock-mcp", "version": "dev" },
+                            "capabilities": { "tools/list": true, "tools/call": true, "ping": true }
+                          }
+                        }
+              - simple: "${body[method]} == 'tools/list'"
+                steps:
+                  - setBody:
+                      constant: |
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 2,
+                          "result": {
+                            "tools": [
+                              { "name": "generateCode", "description": "Mock code generation tool" },
+                              { "name": "analyzeQuery", "description": "Mock analysis tool" }
+                            ]
+                          }
+                        }
+              - simple: "${body[method]} == 'tools/call'"
+                steps:
+                  - setBody:
+                      constant: |
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 3,
+                          "result": { "output": "Tool executed successfully." }
+                        }
+            otherwise:
+              steps:
+                - setBody:
+                    constant: |
+                      {
+                        "jsonrpc": "2.0",
+                        "id": 999,
+                        "error": { "code": -32601, "message": "Unsupported method" }
+                      }

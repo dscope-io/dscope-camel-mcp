@@ -1,0 +1,6 @@
+{
+  "name": "camel-mcp",
+  "version": "1.0.0",
+  "description": "Apache Camel MCP generic component",
+  "endpoints": { "http": "http://localhost:8080/mcp" }
+}

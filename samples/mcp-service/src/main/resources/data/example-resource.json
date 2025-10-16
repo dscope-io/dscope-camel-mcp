@@ -1,0 +1,9 @@
+{
+  "title": "Example Resource",
+  "description": "This payload is served from a static JSON file for the MCP response sample.",
+  "items": [
+    { "id": 1, "name": "Alpha" },
+    { "id": 2, "name": "Beta" },
+    { "id": 3, "name": "Gamma" }
+  ]
+}

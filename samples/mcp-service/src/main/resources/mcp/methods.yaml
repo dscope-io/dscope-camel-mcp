@@ -1,0 +1,49 @@
+methods:
+  - name: echo
+    title: Echo Tool
+    description: Returns the provided text as MCP content.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+          description: Text to echo back to the caller.
+      required:
+        - text
+    outputSchema:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+    annotations:
+      categories:
+        - utility
+  - name: summarize
+    title: Summarize Tool
+    description: Generates a short summary of the supplied text payload.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+          description: Passage to summarize.
+        maxWords:
+          type: integer
+          description: Maximum word count of the summary.
+          default: 50
+      required:
+        - text
+    outputSchema:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+    annotations:
+      categories:
+        - analysis

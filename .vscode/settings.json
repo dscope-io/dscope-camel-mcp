@@ -1,0 +1,6 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.maven.enabled": true,
+  "maven.executable": "/Users/roman/.sdkman/candidates/maven/3.9.1/bin/mvn",
+  "maven.executable.path": "/Users/roman/.sdkman/candidates/maven/3.9.1/bin/mvn"
+}

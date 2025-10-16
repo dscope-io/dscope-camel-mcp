@@ -1,0 +1,14 @@
+title: Apache Camel MCP Component
+description: Model Context Protocol (MCP) integration for Apache Camel.
+theme: jekyll-theme-minimal
+logo: /docs/assets/diagram.png
+show_downloads: true
+navigation:
+  - title: Home
+    url: /docs/index.html
+  - title: Quickstart
+    url: /docs/quickstart.html
+  - title: Architecture
+    url: /docs/architecture.html
+  - title: Publish Guide
+    url: /docs/PUBLISH_GUIDE.html

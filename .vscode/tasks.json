@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build with Maven",
+      "type": "shell",
+      "command": "/Users/roman/.sdkman/candidates/maven/3.9.1/bin/mvn",
+      "args": ["clean", "install"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Run Camel MCP",
+      "type": "shell",
+      "command": "/Users/roman/.sdkman/candidates/maven/3.9.1/bin/mvn",
+      "args": [
+        "exec:java",
+        "-Dexec.mainClass=org.apache.camel.main.Main"
+      ],
+      "dependsOn": ["Build with Maven"],
+      "group": "test"
+    }
+  ]
+}

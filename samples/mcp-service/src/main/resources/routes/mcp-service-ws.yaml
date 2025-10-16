@@ -1,0 +1,151 @@
+- onException:
+    exception:
+      - java.lang.IllegalArgumentException
+    handled:
+      constant: "true"
+    steps:
+      - setProperty:
+          name: mcp.error.code
+          constant: "-32600"
+      - setProperty:
+          name: mcp.error.message
+          simple: "${exception.message}"
+      - process:
+          ref: mcpError
+
+- route:
+    id: mcp-service-ws
+    from:
+      uri: "undertow:ws://0.0.0.0:8090/mcp?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+      steps:
+        - process:
+            ref: mcpRequestSizeGuard
+        - process:
+            ref: mcpRateLimit
+        - process:
+            ref: mcpJsonRpcEnvelope
+        - log:
+            loggingLevel: DEBUG
+            message: "Received from client: ${body}"
+        - choice:
+            when:
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'health'"
+                steps:
+                  - log:
+                      loggingLevel: DEBUG
+                      message: "Handling websocket ${exchangeProperty.mcp.jsonrpc.method} request"
+                  - process:
+                      ref: mcpHealthStatus
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'stream'"
+                steps:
+                  - log:
+                      loggingLevel: DEBUG
+                      message: "Handling websocket ${exchangeProperty.mcp.jsonrpc.method} request"
+                  - process:
+                      ref: mcpStream
+              - simple: "${exchangeProperty.mcp.jsonrpc.type} == 'NOTIFICATION'"
+                steps:
+                  - process:
+                      ref: mcpNotification
+                  - log:
+                      loggingLevel: INFO
+                      message: "Notification received: ${body}"
+                  - stop: {}
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'initialize'"
+                steps:
+                  - process:
+                      ref: mcpInitialize
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ping'"
+                steps:
+                  - process:
+                      ref: mcpPing
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'"
+                steps:
+                  - process:
+                      ref: sampleResourceRequest
+                  - process:
+                      ref: sampleResourceResponse
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/list'"
+                steps:
+                  - process:
+                      ref: mcpToolsList
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/call'"
+                steps:
+                  - doTry:
+                      steps:
+                        - process:
+                            ref: sampleToolCallProcessor
+                      doCatch:
+                        - exception:
+                            - java.lang.Exception
+                          steps:
+                            - setProperty:
+                                name: mcp.error.code
+                                constant: "-32603"
+                            - setProperty:
+                                name: mcp.error.message
+                                simple: "Tool execution failed: ${exception.message}"
+                            - process:
+                                ref: mcpError
+            otherwise:
+              steps:
+                - setProperty:
+                    name: mcp.error.code
+                    constant: "-32601"
+                - setProperty:
+                    name: mcp.error.message
+                    simple: "Unsupported MCP method: ${exchangeProperty.mcp.jsonrpc.method}"
+                - process:
+                    ref: mcpError
+        - choice:
+            when:
+              - simple: "${header.Content-Type} == null"
+                steps:
+                  - setHeader:
+                      name: Content-Type
+                      constant: application/json
+        - convertBodyTo:
+            type: java.lang.String
+        - log:
+            loggingLevel: DEBUG
+            message: "Returning JSON-RPC response: ${body}"
+        - setHeader:
+            name: CamelWebSocketSendToAll
+            constant: false
+        - to: "undertow:ws://0.0.0.0:8090/mcp"
+
+- route:
+    id: mcp-service-ws-stream
+    from:
+      uri: "undertow:http://0.0.0.0:8090/mcp/stream?httpMethodRestrict=GET"
+      steps:
+        - process:
+            ref: mcpStream
+
+- route:
+    id: mcp-service-ws-health
+    from:
+      uri: "undertow:http://0.0.0.0:8090/mcp/health?httpMethodRestrict=GET"
+      steps:
+        - process:
+            ref: mcpHealthStatus
+
+- route:
+    id: mcp-service-ws-notifications
+    from:
+      uri: "undertow:http://0.0.0.0:8090/mcp/notifications?httpMethodRestrict=POST"
+      steps:
+        - convertBodyTo:
+            type: java.lang.String
+        - log:
+            loggingLevel: DEBUG
+            message: "Broadcasting server notification: ${body}"
+        - setHeader:
+            name: CamelWebSocketSendToAll
+            constant: true
+        - to: "undertow:ws://0.0.0.0:8090/mcp"
+        - setHeader:
+            name: CamelHttpResponseCode
+            constant: "202"
+        - setBody:
+            constant: ""

@@ -1,0 +1,112 @@
+- onException:
+    exception:
+      - java.lang.IllegalArgumentException
+    handled:
+      constant: "true"
+    steps:
+      - setHeader:
+          name: CamelHttpResponseCode
+          constant: "400"
+      - setHeader:
+          name: Content-Type
+          constant: application/json
+      - setProperty:
+          name: mcp.error.code
+          constant: "-32600"
+      - setProperty:
+          name: mcp.error.message
+          simple: "${exception.message}"
+      - process:
+          ref: mcpError
+
+- route:
+    id: mcp-service-http
+    from:
+      uri: undertow:http://0.0.0.0:8080/mcp?httpMethodRestrict=POST
+      steps:
+        - process:
+            ref: mcpRequestSizeGuard
+        - process:
+            ref: mcpHttpValidator
+        - process:
+            ref: mcpRateLimit
+        - process:
+            ref: mcpJsonRpcEnvelope
+        - choice:
+            when:
+              - simple: "${exchangeProperty.mcp.jsonrpc.type} == 'NOTIFICATION'"
+                steps:
+                  - process:
+                      ref: mcpNotification
+                  - choice:
+                      when:
+                        - simple: "${exchangeProperty.mcp.notification.type} == 'initialized'"
+                          steps:
+                            - process:
+                                ref: mcpNotificationsInitialized
+                      otherwise:
+                        steps:
+                          - process:
+                              ref: mcpNotificationAck
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'initialize'"
+                steps:
+                  - process:
+                      ref: mcpInitialize
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ping'"
+                steps:
+                  - process:
+                      ref: mcpPing
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'"
+                steps:
+                  - process:
+                      ref: sampleResourceRequest
+                  - process:
+                      ref: sampleResourceResponse
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/list'"
+                steps:
+                  - process:
+                      ref: mcpToolsList
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/call'"
+                steps:
+                  - doTry:
+                      steps:
+                        - process:
+                            ref: sampleToolCallProcessor
+                      doCatch:
+                        - exception:
+                            - java.lang.Exception
+                          steps:
+                            - setProperty:
+                                name: mcp.error.code
+                                constant: "-32603"
+                            - setProperty:
+                                name: mcp.error.message
+                                simple: "Tool execution failed: ${exception.message}"
+                            - process:
+                                ref: mcpError
+            otherwise:
+              steps:
+                - setProperty:
+                    name: mcp.error.code
+                    constant: "-32601"
+                - setProperty:
+                    name: mcp.error.message
+                    simple: "Unsupported MCP method: ${exchangeProperty.mcp.jsonrpc.method}"
+                - process:
+                    ref: mcpError
+
+- route:
+    id: mcp-service-stream
+    from:
+      uri: undertow:http://0.0.0.0:8080/mcp/stream?httpMethodRestrict=GET
+      steps:
+        - process:
+            ref: mcpStream
+
+- route:
+    id: mcp-service-health
+    from:
+      uri: undertow:http://0.0.0.0:8080/mcp/health?httpMethodRestrict=GET
+      steps:
+        - process:
+            ref: mcpHealthStatus

@@ -1,0 +1,28 @@
+# Example Camel route to test MCP component
+- route:
+    id: test-mcp-producer
+    from:
+      uri: "timer://runOnce?repeatCount=1"
+      steps:
+        - setBody:
+            constant: |
+              {
+                "method": "initialize",
+                "params": {
+                  "clientInfo": {
+                    "name": "camel-mcp-tester",
+                    "version": "1.0.0"
+                  },
+                  "capabilities": {
+                    "tools/list": true,
+                    "tools/call": true
+                  }
+                }
+              }
+        - unmarshal:
+            json:
+              library: Jackson
+        - to:
+            uri: "mcp:http://localhost:8080/mcp?method=initialize"
+        - log:
+            message: "MCP Response: ${body}"

@@ -1,0 +1,130 @@
+{
+  "info": {
+    "_postman_id": "2f6c08d8-a2f3-4d09-99f0-1b2d66a2d4e3",
+    "name": "Camel MCP Sample",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sample requests for exercising the Camel MCP reference service on http://localhost:8080"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Ping",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/mcp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "mcp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ping-1\",\n  \"method\": \"ping\",\n  \"params\": {}\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Resources / Get (example-resource)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": []
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/mcp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "mcp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"resource-1\",\n  \"method\": \"resources/get\",\n  \"params\": {\n    \"resource\": \"{{resource_name}}\"\n  }\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Tools / List",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/mcp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "mcp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"tools-list-1\",\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Tools / Call (sample tool)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/mcp",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "mcp"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"tools-call-1\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"sample-tool\",\n    \"arguments\": {\n      \"input\": \"Hello from Postman!\"\n    }\n  }\n}"
+        }
+      },
+      "response": []
+    }
+  ]
+}

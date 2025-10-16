@@ -1,0 +1,71 @@
+{
+  "info": {
+    "_postman_id": "3c8ce4b0-15fb-4d4a-b0de-8d9c0e7ef9d6",
+    "name": "Camel MCP WebSocket Sample",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sample WebSocket messages for the Camel MCP service running on ws://localhost:8090"
+  },
+  "variable": [
+    {
+      "key": "ws_base_url",
+      "value": "ws://localhost:8090",
+      "type": "string"
+    },
+    {
+      "key": "resource_name",
+      "value": "example-resource",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "MCP WebSocket Session",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{ws_base_url}}/mcp",
+          "host": [
+            "{{ws_base_url}}"
+          ],
+          "path": [
+            "mcp"
+          ]
+        },
+        "description": "Connect to the sample MCP WebSocket endpoint then send JSON-RPC envelopes from the saved messages list."
+      },
+      "protocolProfileBehavior": {
+        "websocket": {
+          "messages": [
+            {
+              "name": "initialize",
+              "type": "text",
+              "message": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ws-init-1\",\n  \"method\": \"initialize\",\n  \"params\": {\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}"
+            },
+            {
+              "name": "ping",
+              "type": "text",
+              "message": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ws-ping-1\",\n  \"method\": \"ping\",\n  \"params\": {}\n}"
+            },
+            {
+              "name": "resources/get",
+              "type": "text",
+              "message": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ws-resource-1\",\n  \"method\": \"resources/get\",\n  \"params\": {\n    \"resource\": \"{{resource_name}}\"\n  }\n}"
+            },
+            {
+              "name": "tools/list",
+              "type": "text",
+              "message": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ws-tools-list-1\",\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+            },
+            {
+              "name": "tools/call",
+              "type": "text",
+              "message": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ws-tools-call-1\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"sample-tool\",\n    \"arguments\": {\n      \"input\": \"Hello from Postman over WebSocket!\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
