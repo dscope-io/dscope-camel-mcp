@@ -1,16 +1,65 @@
-# Camel MCP Component
+# Apache Camel MCP Component
 
-## Overview
-`camel-mcp` is a general-purpose [Model Context Protocol (MCP)](https://modelcontextprotocol.io) component for Apache Camel 4.
-It allows routes to act as MCP clients or servers while speaking JSON-RPC 2.0 over HTTP.
+> Apache Camel 4 extension that speaks the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) over JSON-RPC so agents and automations can call your Camel routes as tools.
 
-### Requirements
+## 📦 Versions
+
+| Channel | Version | Maven Coordinate | Notes |
+| --- | --- | --- | --- |
+| Latest Release | 1.0.0 | `io.dscope.camel:camel-mcp:1.0.0` | Recommended for production use |
+| Development Snapshot | 1.0.0 | `io.dscope.camel:camel-mcp:1.0.0` | Build from source (`mvn install`) to track `main` |
+
+## 📋 Requirements
+
 - Java 21+
 - Maven 3.9+
-- Apache Camel 4.15.0 (managed via the project `pom.xml`)
+- Apache Camel 4.15.0+
 
-### Example
-The tests and sample runner load Camel YAML DSL files. A minimal client route looks like:
+## 🚀 Features
+
+- Implements core MCP JSON-RPC methods: `initialize`, `ping`, `resources/get`, `tools/list`, and `tools/call`.
+- Sends MCP traffic over standard Camel HTTP clients and exposes WebSocket helpers for streaming scenarios.
+- Ships registry processors for JSON-RPC envelopes, tool catalogs, and notification workflows.
+- Sample service and Postman collections to exercise MCP flows end-to-end.
+
+## 🛠 Installation
+
+### Maven Dependency (Release)
+
+```xml
+<dependency>
+  <groupId>io.dscope.camel</groupId>
+  <artifactId>camel-mcp</artifactId>
+  <version>1.0.0</version>
+</dependency>
+```
+
+### Build From Source (Snapshot)
+
+```bash
+git clone https://github.com/dscope-io/dscope-camel-mcp.git
+cd dscope-camel-mcp
+mvn clean install
+```
+
+## 🔧 Configuration
+
+### URI Format
+
+```
+mcp:http://host:port/mcp?method=tools/list
+```
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `method` | `tools/list` | MCP JSON-RPC method to invoke when producing |
+| `configuration.*` | - | Any setters on `McpConfiguration` are available as URI parameters |
+
+The exchange body should be a `Map` representing MCP `params`. The producer enriches it with `jsonrpc`, `id`, and the configured `method` before invoking the downstream HTTP endpoint.
+
+## 📚 Usage Examples
+
+### Minimal YAML Client
 
 ```yaml
 - route:
@@ -38,26 +87,7 @@ The tests and sample runner load Camel YAML DSL files. A minimal client route lo
             message: "MCP Response: ${body}"
 ```
 
-### Features
-- Supports core MCP JSON-RPC methods: `initialize`, `ping`, `resources/get`, `tools/list`, and `tools/call`.
-- Simple HTTP and WebSocket transports with automatic JSON-RPC envelope handling.
-- Extensible configuration for future streaming (SSE / WS) and custom processors.
-
-### Extensibility
-- Extend `io.dscope.camel.mcp.processor.AbstractMcpRequestProcessor` for custom request handling. It normalizes JSON-RPC metadata and exposes a template method with the already decoded parameters.
-- Extend `io.dscope.camel.mcp.processor.AbstractMcpResponseProcessor` for JSON-RPC responses. It provides helpers for writing result/error envelopes and applying standard protocol headers.
-- Notification flows can reuse `McpNotificationProcessor` to populate exchange properties, then branch to resource-specific processors built on these base classes.
-
-### Build
-```bash
-mvn clean install
-```
-
-The integration test boots an Undertow mock server route defined under `src/test/resources/routes`. During the build Maven will start and stop this embedded server automatically.
-
-### Resources/Get Usage
-
-The component exposes a convenience route for retrieving static resources via the sample service:
+### Resources/Get With Sample Service
 
 ```yaml
 - route:
@@ -81,9 +111,21 @@ The component exposes a convenience route for retrieving static resources via th
             message: "Resource payload: ${body[result]}"
 ```
 
-With the sample service running (see below), the exchange body returns the JSON contents stored under `samples/mcp-service/src/main/resources/data/example-resource.json`.
+## 🤖 MCP Tooling
 
-### Running the Samples
+- `AbstractMcpRequestProcessor` and `AbstractMcpResponseProcessor` provide templates for custom tool handlers.
+- `McpNotificationProcessor` normalizes JSON-RPC notifications and exchange properties.
+- Tool catalogs load from `classpath:mcp/methods.yaml` and feed `tools/list` responses automatically.
+
+## 🧪 Testing
+
+```bash
+mvn clean install
+```
+
+The integration test boots a mock MCP server defined in `src/test/resources/routes` via Camel Main.
+
+## 🧰 Samples
 
 ```bash
 # Core component smoke test
@@ -93,7 +135,7 @@ mvn exec:java -Dexec.mainClass=org.apache.camel.main.Main
 mvn -f samples/mcp-service/pom.xml exec:java
 ```
 
-When the HTTP sample service is active you can exercise the endpoints with `curl`:
+When the sample is running you can exercise the MCP HTTP endpoint:
 
 ```bash
 curl -s \
@@ -102,6 +144,20 @@ curl -s \
   http://localhost:8080/mcp
 ```
 
-With the sample running you'll have HTTP endpoints on `http://localhost:8080` and WebSocket helpers on `ws://localhost:8090/mcp`. Add `-Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml` if you need the WebSocket helpers alone, or point tooling at `samples/mcp-service/target/openapi/mcp-service.yaml` (generated via `mvn package`) for the HTTP contract. Custom tools are declared in `samples/mcp-service/src/main/resources/mcp/methods.yaml`; they flow straight into the `tools/list` handler without extra wiring.
+HTTP endpoints listen on `http://localhost:8080`; WebSocket helpers are available on `ws://localhost:8090/mcp`. Generated OpenAPI definitions live under `samples/mcp-service/target/openapi/`. Postman collections are bundled in `samples/mcp-service/postman/` for interactive exploration.
 
-For an interactive workflow import the HTTP collection (`Camel-MCP-Sample.postman_collection.json`) and environment from `samples/mcp-service/postman/`, then run the provided `resources/get`, `ping`, `tools/list`, and `tools/call` requests. To try the WebSocket variant, import `Camel-MCP-WebSocket.postman_collection.json` with its environment or connect with a client such as `npx wscat -c ws://localhost:8090/mcp` and send MCP JSON-RPC envelopes directly.
+## 🧱 Project Layout
+
+```
+io.dscope.camel.mcp/
+├── McpComponent        # Camel component entry point
+├── McpEndpoint         # Holds configuration and producer/consumer instances
+├── McpProducer         # Sends MCP JSON-RPC requests over HTTP
+├── McpConsumer         # Planned inbound server (stub)
+├── processor/          # JSON-RPC request/response helpers and tool processors
+└── model/              # Jackson POJOs for MCP requests/responses
+```
+
+## 📄 License
+
+Licensed under the Apache License 2.0. See `LICENSE` for the full text.
