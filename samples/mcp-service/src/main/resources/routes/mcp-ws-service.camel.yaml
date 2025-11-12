@@ -111,7 +111,7 @@
             message: "Returning JSON-RPC response: ${body}"
         - setHeader:
             name: CamelWebSocketSendToAll
-            constant: false
+            constant: "false"
         - to: "undertow:ws://0.0.0.0:8090/mcp"
 
 - route:
@@ -142,7 +142,7 @@
             message: "Broadcasting server notification: ${body}"
         - setHeader:
             name: CamelWebSocketSendToAll
-            constant: true
+            constant: "true"
         - to: "undertow:ws://0.0.0.0:8090/mcp"
         - setHeader:
             name: CamelHttpResponseCode

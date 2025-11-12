@@ -2,6 +2,7 @@ package io.dscope.camel.mcp.processor;
 
 import java.util.Map;
 
+import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
  * notification metadata. The processor assumes JSON-RPC notifications use the
  * {@code notifications/<type>} naming convention defined by the MCP spec.
  */
+@BindToRegistry("mcpNotification")
 public class McpNotificationProcessor extends AbstractMcpRequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(McpNotificationProcessor.class);

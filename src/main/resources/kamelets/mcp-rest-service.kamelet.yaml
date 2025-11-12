@@ -1,0 +1,168 @@
+apiVersion: camel.apache.org/v1
+kind: Kamelet
+metadata:
+  name: mcp-rest-service
+spec:
+  definition:
+    title: Model Context Protocol Service
+    description: >-
+      Minimal MCP service Kamelet exposing a single HTTP endpoint that dispatches JSON-RPC requests
+      to Camel processors (initialize, ping, tools/list, tools/call). Supports health checks and server-sent events (SSE) stream.
+    type: object
+    properties:
+      restComponent:
+        title: REST Component
+        description: Camel REST component to use (e.g., platform-http or undertow).
+        type: string
+        default: undertow
+      restHost:
+        title: REST Host
+        description: Host/interface for the MCP HTTP endpoint.
+        type: string
+        default: 0.0.0.0
+      restPort:
+        title: REST Port
+        description: Port for the MCP HTTP endpoint.
+        type: integer
+        default: 8080
+      restContextPath:
+        title: REST Context Path
+        description: Leading context path (include trailing slash if desired).
+        type: string
+        default: /mcp
+      toolsCallBean:
+        title: Tools Call Bean
+        description: Bean that handles tools/call requests.
+        type: string
+        default: calendarToolsCall
+  dependencies:
+    - "camel:{{restComponent}}"
+    - "camel:undertow"
+    - "camel:bean"
+    - "camel:direct"
+  template:
+    beans:
+      - name: mcpJsonRpcEnvelope
+        type: io.dscope.camel.mcp.processor.McpJsonRpcEnvelopeProcessor
+      - name: mcpInitialize
+        type: io.dscope.camel.mcp.processor.McpInitializeProcessor
+      - name: mcpPing
+        type: io.dscope.camel.mcp.processor.McpPingProcessor
+      - name: mcpToolsList
+        type: io.dscope.camel.mcp.processor.McpToolsListProcessor
+      - name: mcpStream
+        type: io.dscope.camel.mcp.processor.McpStreamProcessor
+      - name: mcpHealthStatus
+        type: io.dscope.camel.mcp.processor.McpHealthStatusProcessor
+      - name: mcpNotification
+        type: io.dscope.camel.mcp.processor.McpNotificationProcessor
+      - name: mcpNotificationsInitialized
+        type: io.dscope.camel.mcp.processor.McpNotificationsInitializedProcessor
+      - name: mcpNotificationAck
+        type: io.dscope.camel.mcp.processor.McpNotificationAckProcessor
+    from:
+      uri: "{{restComponent}}:http://{{restHost}}:{{restPort}}{{restContextPath}}?matchOnUriPrefix=true"
+      steps:
+        - to: "log:io.dscope.camel.mcp.incoming?level=INFO&showAll=true&multiline=true&maxChars=10000"
+        - log:
+            loggingLevel: INFO
+            message: "MCP Service Kamelet invoked on {{restComponent}}://{{restHost}}:{{restPort}}{{restContextPath}}${header.CamelHttpPath} (${header.CamelHttpMethod})"
+        - choice:
+            when:
+              # Health probe: GET /mcp/health
+              - simple: "${header.CamelHttpMethod} == 'GET' && ${header.CamelHttpPath} endsWith '/health'"
+                steps:
+                  - log:
+                      loggingLevel: INFO
+                      message: "MCP Health Status requested"
+                  - process:
+                      ref: mcpHealthStatus
+                  - setHeader:
+                      name: Content-Type
+                      constant: application/json
+                  - convertBodyTo:
+                      type: java.lang.String
+              # Stream (SSE) endpoint: GET /mcp/stream
+              - simple: "${header.CamelHttpMethod} == 'GET' && ${header.CamelHttpPath} endsWith '/stream'"
+                steps:
+                  - log:
+                      loggingLevel: INFO
+                      message: "MCP Stream requested"
+                  - process:
+                      ref: mcpStream
+              # JSON-RPC POST dispatcher: POST /mcp (accept both /mcp and /mcp/)
+              - simple: "${header.CamelHttpMethod} == 'POST'"
+                steps:
+                  - to: "bean:mcpJsonRpcEnvelope"
+                  - log:
+                      loggingLevel: DEBUG
+                      message: "MCP JSON-RPC payload: ${body}"
+                  - log:
+                      loggingLevel: INFO
+                      message: "MCP JSON-RPC request received: ${exchangeProperty[mcp.jsonrpc.method]}"
+                  - choice:
+                      when:
+                        # Notifications branch
+                        - simple: "${exchangeProperty[mcp.jsonrpc.type]} == 'NOTIFICATION'"
+                          steps:
+                            - log:
+                                loggingLevel: INFO
+                                message: "MCP Notification received"
+                            - to: "bean:mcpNotification"
+                            - choice:
+                                when:
+                                  - simple: "${exchangeProperty[mcp.notification.type]} == 'initialized'"
+                                    steps:
+                                      - to: "bean:mcpNotificationsInitialized"
+                                otherwise:
+                                  steps:
+                                    - to: "bean:mcpNotificationAck"
+                        # Request methods branch
+                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'initialize'"
+                          steps:
+                            - log:
+                                loggingLevel: INFO
+                                message: "MCP Initialize request received"  
+                            - to: mcpInitialize
+                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ping'"
+                          steps:
+                            - log:
+                                loggingLevel: INFO
+                                message: "MCP Ping request received"
+                            - to: mcpPing
+                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/list'"
+                          steps:
+                            - log:
+                                loggingLevel: INFO
+                                message: "MCP Tools List request received"
+                            - to: mcpToolsList
+                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/call'"
+                          steps:
+                            - log:
+                                loggingLevel: INFO
+                                message: "MCP Tools Call request for bean {{toolsCallBean}} received"
+                            - to: "bean:{{toolsCallBean}}"
+                      otherwise:
+                        steps:
+                          - log:
+                              loggingLevel: WARN
+                              message: "Unsupported MCP method: ${exchangeProperty[mcp.jsonrpc.method]}"
+                  - choice:
+                      when:
+                        - simple: "${body} != null"
+                          steps:
+                            - setHeader:
+                                name: Content-Type
+                                constant: application/json
+                            - convertBodyTo:
+                                type: java.lang.String
+            otherwise:
+              steps:
+                - log:
+                    loggingLevel: WARN
+                    message: "Unsupported HTTP method or path: ${header.CamelHttpMethod} ${header.CamelHttpPath}"
+                - setHeader:
+                    name: CamelHttpResponseCode
+                    constant: "404"
+                - setBody:
+                    constant: ""

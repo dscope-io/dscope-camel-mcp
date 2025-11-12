@@ -1,5 +1,6 @@
 package io.dscope.camel.mcp.processor;
 
+import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 
@@ -9,6 +10,7 @@ import org.apache.camel.Processor;
  * {@code notifications/initialized} notification so other notification types
  * can share the acknowledgement logic.
  */
+@BindToRegistry("mcpNotificationAck")
 public class McpNotificationAckProcessor implements Processor {
 
     private final McpNotificationsInitializedProcessor delegate = new McpNotificationsInitializedProcessor();

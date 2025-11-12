@@ -1,2 +1,7 @@
 samples/mcp-service/target
 target
+.vscode/
+.gitignore
+.DS_Store
+.vscode/tasks.json
+.vscode

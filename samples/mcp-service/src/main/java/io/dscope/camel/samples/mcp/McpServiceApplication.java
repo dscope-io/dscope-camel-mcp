@@ -28,7 +28,7 @@ public final class McpServiceApplication extends McpComponentApplicationSupport 
 
     @Override
     protected String routesIncludePattern() {
-        return "classpath:routes/mcp-service*.yaml";
+        return "classpath:routes/mcp-rest-service.camel.yaml";
     }
 
     @Override

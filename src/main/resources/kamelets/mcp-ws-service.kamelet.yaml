@@ -1,0 +1,123 @@
+apiVersion: camel.apache.org/v1
+kind: Kamelet
+metadata:
+  name: mcp-ws-service
+spec:
+  definition:
+    title: Model Context Protocol WebSocket Service
+    description: >-
+      Provides an MCP (Model Context Protocol) endpoint over WebSocket plus auxiliary HTTP
+      endpoints for health checks, server-sent stream, and server notifications broadcasting.
+      Wraps JSON-RPC 2.0 messages and dispatches to MCP processors (initialize, ping, tools/list,
+      tools/call, resources/get) while supporting notifications and server push.
+    type: object
+    properties:
+      wsComponent:
+        title: WebSocket Component
+        description: Camel WebSocket component to use (e.g., platform-websocket or undertow).
+        type: string
+        default: undertow    
+      wsHost:
+        title: WebSocket Host
+        description: Host/interface for the WebSocket endpoint.
+        type: string
+        default: 0.0.0.0
+      wsPort:
+        title: WebSocket Port
+        description: Port for the WebSocket endpoint.
+        type: integer
+        default: 8090
+      wsPath:
+        title: WebSocket Path
+        description: Path for the MCP WebSocket (no trailing slash).
+        type: string
+        default: /mcp
+      enableResources:
+        title: Enable Resource Methods
+        description: Whether to enable sample resources/get request/response processors.
+        type: boolean
+        default: true
+      toolsCallBean:
+        title: Tools Call Bean
+        description: Bean that handles tools/call requests.
+        type: string
+        default: sampleToolCallProcessor
+  dependencies:
+    - "camel:{{wsComponent}}"
+    - "camel:undertow"
+    - "camel:bean"
+  template:
+    beans:
+      - name: mcpJsonRpcEnvelope
+        type: io.dscope.camel.mcp.processor.McpJsonRpcEnvelopeProcessor
+      - name: mcpInitialize
+        type: io.dscope.camel.mcp.processor.McpInitializeProcessor
+      - name: mcpPing
+        type: io.dscope.camel.mcp.processor.McpPingProcessor
+      - name: mcpToolsList
+        type: io.dscope.camel.mcp.processor.McpToolsListProcessor
+      - name: mcpStream
+        type: io.dscope.camel.mcp.processor.McpStreamProcessor
+      - name: mcpHealthStatus
+        type: io.dscope.camel.mcp.processor.McpHealthStatusProcessor
+      - name: mcpNotification
+        type: io.dscope.camel.mcp.processor.McpNotificationProcessor
+      - name: mcpNotificationsInitialized
+        type: io.dscope.camel.mcp.processor.McpNotificationsInitializedProcessor
+      - name: mcpNotificationAck
+        type: io.dscope.camel.mcp.processor.McpNotificationAckProcessor
+      - name: mcpError
+        type: io.dscope.camel.mcp.processor.McpErrorProcessor
+      - name: mcpRateLimit
+        type: io.dscope.camel.mcp.processor.McpRateLimitProcessor
+      - name: mcpRequestSizeGuard
+        type: io.dscope.camel.mcp.processor.McpRequestSizeGuardProcessor
+    from:
+      uri: "{{wsComponent}}:ws://{{wsHost}}:{{wsPort}}{{wsPath}}?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+      steps:
+        - process: { ref: mcpRequestSizeGuard }
+        - process: { ref: mcpRateLimit }
+        - to: "bean:mcpJsonRpcEnvelope"
+        - log:
+            loggingLevel: DEBUG
+            message: "WebSocket received: ${body}"
+        - choice:
+            when:
+              - simple: "${exchangeProperty.mcp.jsonrpc.type} == 'NOTIFICATION'"
+                steps:
+                  - to: "bean:mcpNotification"
+                  - log:
+                      loggingLevel: INFO
+                      message: "Notification: ${exchangeProperty[mcp.notification.type]}"
+                  - stop: {}
+              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'initialize'"
+                steps:
+                  - to: mcpInitialize
+              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ping'"
+                steps:
+                  - to: mcpPing
+              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/list'"
+                steps:
+                  - to: mcpToolsList
+              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/call'"
+                steps:
+                  - to: "bean:{{toolsCallBean}}"
+            otherwise:
+              steps:
+                - setProperty: { name: mcp.error.code, constant: "-32601" }
+                - setProperty:
+                    name: mcp.error.message
+                    simple: "Unsupported MCP method: ${exchangeProperty[mcp.jsonrpc.method]}"
+                - process: { ref: mcpError }
+        - choice:
+            when:
+              - simple: "${header.Content-Type} == null"
+                steps:
+                  - setHeader: { name: Content-Type, constant: application/json }
+        - convertBodyTo: { type: java.lang.String }
+        - log:
+            loggingLevel: DEBUG
+            message: "WebSocket returning: ${body}"
+        - setHeader: { name: CamelWebSocketSendToAll, constant: "false" }
+        - to: "{{wsComponent}}:ws://{{wsHost}}:{{wsPort}}{{wsPath}}"
+    
