@@ -7,6 +7,8 @@ import org.apache.camel.Exchange;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.apache.camel.support.DefaultExchange;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +17,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dscope.camel.mcp.catalog.McpMethodCatalog;
 import io.dscope.camel.mcp.catalog.McpMethodDefinition;
+import io.dscope.camel.mcp.model.McpToolMeta;
+import io.dscope.camel.mcp.model.McpUiMeta;
 
 class McpToolsListProcessorTest {
 
@@ -81,5 +85,75 @@ class McpToolsListProcessorTest {
         List<Map<String, Object>> tools = (List<Map<String, Object>>) result.get("tools");
         assertTrue(tools.isEmpty());
         assertEquals(McpHttpValidatorProcessor.DEFAULT_PROTOCOL_VERSION, exchange.getIn().getHeader("MCP-Protocol-Version"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void includesMetaFieldWhenPresent() throws Exception {
+        McpMethodDefinition definition = new McpMethodDefinition();
+        definition.setName("calendar.book");
+        definition.setTitle("Book Appointment");
+        definition.setDescription("Books a calendar appointment");
+        
+        McpUiMeta uiMeta = new McpUiMeta("ui://calendar/app", null, "light");
+        McpToolMeta meta = new McpToolMeta(uiMeta, Map.of("category", "calendar"));
+        definition.setMeta(meta);
+
+        McpMethodCatalog catalog = new McpMethodCatalog(List.of(definition));
+        McpToolsListProcessor processor = new McpToolsListProcessor(catalog);
+
+        DefaultCamelContext ctx = new DefaultCamelContext();
+        Exchange exchange = new DefaultExchange(ctx);
+        exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID, "meta-test");
+        exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, "2025-06-18");
+
+        processor.process(exchange);
+
+        Map<String, Object> body = MAPPER.readValue(exchange.getIn().getBody(String.class), MAP_TYPE);
+        Map<String, Object> result = (Map<String, Object>) body.get("result");
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) result.get("tools");
+        assertEquals(1, tools.size());
+        
+        Map<String, Object> tool = tools.get(0);
+        assertEquals("calendar.book", tool.get("name"));
+        
+        // Verify _meta field is present
+        Map<String, Object> toolMeta = (Map<String, Object>) tool.get("_meta");
+        assertNotNull(toolMeta);
+        
+        Map<String, Object> ui = (Map<String, Object>) toolMeta.get("ui");
+        assertNotNull(ui);
+        assertEquals("ui://calendar/app", ui.get("resourceUri"));
+        assertEquals("light", ui.get("theme"));
+        
+        Map<String, Object> hints = (Map<String, Object>) toolMeta.get("hints");
+        assertNotNull(hints);
+        assertEquals("calendar", hints.get("category"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void excludesMetaFieldWhenNull() throws Exception {
+        McpMethodDefinition definition = new McpMethodDefinition();
+        definition.setName("simple-tool");
+        definition.setDescription("A tool without meta");
+        // Note: meta is not set
+
+        McpMethodCatalog catalog = new McpMethodCatalog(List.of(definition));
+        McpToolsListProcessor processor = new McpToolsListProcessor(catalog);
+
+        DefaultCamelContext ctx = new DefaultCamelContext();
+        Exchange exchange = new DefaultExchange(ctx);
+        exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID, "no-meta");
+
+        processor.process(exchange);
+
+        Map<String, Object> body = MAPPER.readValue(exchange.getIn().getBody(String.class), MAP_TYPE);
+        Map<String, Object> result = (Map<String, Object>) body.get("result");
+        List<Map<String, Object>> tools = (List<Map<String, Object>>) result.get("tools");
+        assertEquals(1, tools.size());
+        
+        Map<String, Object> tool = tools.get(0);
+        assertNull(tool.get("_meta"));
     }
 }
