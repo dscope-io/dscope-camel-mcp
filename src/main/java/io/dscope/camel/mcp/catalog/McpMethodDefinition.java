@@ -5,9 +5,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.dscope.camel.mcp.model.McpToolMeta;
+
 /**
  * Represents an MCP tool definition loaded from configuration.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class McpMethodDefinition {
 
     private String name;
@@ -17,6 +23,9 @@ public class McpMethodDefinition {
     private Map<String, Object> inputSchema = Map.of();
     private Map<String, Object> outputSchema = Map.of();
     private List<String> requiredArguments = List.of();
+
+    @JsonProperty("_meta")
+    private McpToolMeta meta;
 
     public String getName() {
         return name;
@@ -89,6 +98,16 @@ public class McpMethodDefinition {
         } else {
             this.requiredArguments = List.copyOf(requiredArguments.stream().filter(Objects::nonNull).map(Object::toString).toList());
         }
+    }
+
+    @JsonProperty("_meta")
+    public McpToolMeta getMeta() {
+        return meta;
+    }
+
+    @JsonProperty("_meta")
+    public void setMeta(McpToolMeta meta) {
+        this.meta = meta;
     }
 
     public Map<String, Object> toToolEntry() {

@@ -62,6 +62,10 @@ public class McpToolsListProcessor extends AbstractMcpResponseProcessor {
         tool.put("inputSchema", deepCopy(definition.getInputSchema()));
         tool.put("outputSchema", deepCopy(definition.getOutputSchema()));
         tool.put("annotations", deepCopy(definition.getAnnotations()));
+        // Include _meta if present
+        if (definition.getMeta() != null) {
+            tool.put("_meta", OBJECT_MAPPER.convertValue(definition.getMeta(), Map.class));
+        }
         return tool;
     }
 

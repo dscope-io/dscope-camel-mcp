@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP App</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+            --error: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            padding: 1rem;
+        }
+
+        #app {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        nav button {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            background: var(--card-bg);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.15s;
+        }
+
+        nav button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        nav button.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card .description {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: border-color 0.15s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #result-container {
+            margin-top: 1rem;
+        }
+
+        .result {
+            background: #f1f5f9;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .result pre {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8125rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .result.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .result.error {
+            border-left: 4px solid var(--error);
+            background: #fef2f2;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .spinner {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header id="header"></header>
+        <nav id="tool-nav"></nav>
+        <main id="tool-container"></main>
+        <div id="result-container"></div>
+    </div>
+    
+    <script>
+    (function() {
+        // Configuration from URL params, postMessage, or defaults
+        const CONFIG = {
+            title: getParam('title', 'MCP App'),
+            toolPrefix: getParam('prefix', ''),
+            theme: getParam('theme', 'default'),
+            mcpEndpoint: getParam('endpoint', '/mcp'),
+            showNav: getParam('nav', 'true') === 'true',
+            singleTool: getParam('tool', ''),
+        };  // END CONFIG
+        
+        let tools = [];
+        let selectedTool = null;
+        
+        function getParam(name, defaultValue) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || defaultValue;
+        }
+        
+        // MCP Communication (postMessage or HTTP)
+        async function callMcp(method, params = {}) {
+            const request = {
+                jsonrpc: '2.0',
+                id: Date.now(),
+                method,
+                params
+            };
+            
+            if (window.parent !== window) {
+                return postMessageCall(request);
+            }
+            return httpCall(request);
+        }
+        
+        async function postMessageCall(request) {
+            return new Promise((resolve, reject) => {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = (event) => {
+                    const response = event.data;
+                    if (response.error) {
+                        reject(new Error(response.error.message || 'Unknown error'));
+                    } else {
+                        resolve(response.result);
+                    }
+                };
+                window.parent.postMessage(request, '*', [channel.port2]);
+                
+                // Timeout after 30 seconds
+                setTimeout(() => reject(new Error('Request timeout')), 30000);
+            });
+        }
+        
+        async function httpCall(request) {
+            const response = await fetch(CONFIG.mcpEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(request)
+            });
+            
+            const json = await response.json();
+            if (json.error) {
+                throw new Error(json.error.message || 'Unknown error');
+            }
+            return json.result;
+        }
+        
+        // Discover tools
+        async function loadTools() {
+            try {
+                const result = await callMcp('tools/list');
+                tools = result.tools || [];
+                
+                // Filter by prefix if configured
+                if (CONFIG.toolPrefix) {
+                    tools = tools.filter(t => t.name.startsWith(CONFIG.toolPrefix));
+                }
+                
+                // Single tool mode
+                if (CONFIG.singleTool) {
+                    tools = tools.filter(t => t.name === CONFIG.singleTool);
+                }
+                
+                renderNav();
+                if (tools.length > 0) {
+                    selectTool(tools[0]);
+                } else {
+                    showEmptyState();
+                }
+            } catch (error) {
+                showError('Failed to load tools: ' + error.message);
+            }
+        }
+        
+        function renderNav() {
+            const nav = document.getElementById('tool-nav');
+            if (!CONFIG.showNav || tools.length <= 1) {
+                nav.style.display = 'none';
+                return;
+            }
+            
+            nav.innerHTML = tools.map(tool => 
+                `<button data-tool="${tool.name}" ${selectedTool?.name === tool.name ? 'class="active"' : ''}>${tool.title || tool.name}</button>`
+            ).join('');
+            
+            nav.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tool = tools.find(t => t.name === btn.dataset.tool);
+                    if (tool) selectTool(tool);
+                });
+            });
+        }
+        
+        function selectTool(tool) {
+            selectedTool = tool;
+            renderNav();
+            renderToolForm(tool);
+            clearResult();
+        }
+        
+        function renderToolForm(tool) {
+            const container = document.getElementById('tool-container');
+            const schema = tool.inputSchema || {};
+            const properties = schema.properties || {};
+            const required = schema.required || [];
+            
+            let html = `<form id="tool-form" class="card">
+                <h2>${tool.title || tool.name}</h2>
+                <p class="description">${tool.description || ''}</p>`;
+            
+            for (const [name, prop] of Object.entries(properties)) {
+                const isRequired = required.includes(name);
+                html += renderField(name, prop, isRequired);
+            }
+            
+            html += `<button type="submit" class="btn btn-primary">Execute</button>
+            </form>`;
+            
+            container.innerHTML = html;
+            
+            document.getElementById('tool-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await executeTool(tool.name);
+            });
+        }
+        
+        function renderField(name, prop, required) {
+            const label = prop.title || name;
+            const type = mapSchemaType(prop);
+            const reqMark = required ? ' *' : '';
+            
+            if (prop.enum) {
+                return `<div class="form-group">
+                    <label>${label}${reqMark}</label>
+                    <select name="${name}" ${required ? 'required' : ''}>
+                        <option value="">Select...</option>
+                        ${prop.enum.map(v => `<option value="${v}">${v}</option>`).join('')}
+                    </select>
+                </div>`;
+            }
+            
+            if (prop.type === 'boolean') {
+                return `<div class="form-group">
+                    <label><input type="checkbox" name="${name}"> ${label}</label>
+                </div>`;
+            }
+            
+            if (prop.type === 'array' || prop.type === 'object') {
+                return `<div class="form-group">
+                    <label>${label}${reqMark} (JSON)</label>
+                    <textarea name="${name}" placeholder="${prop.description || 'Enter JSON...'}"
+                        ${required ? 'required' : ''}></textarea>
+                </div>`;
+            }
+            
+            return `<div class="form-group">
+                <label>${label}${reqMark}</label>
+                <input type="${type}" name="${name}" 
+                       placeholder="${prop.description || ''}"
+                       ${prop.default !== undefined ? `value="${prop.default}"` : ''}
+                       ${required ? 'required' : ''}>
+            </div>`;
+        }
+        
+        function mapSchemaType(prop) {
+            switch (prop.type) {
+                case 'integer':
+                case 'number': return 'number';
+                case 'boolean': return 'checkbox';
+                default:
+                    if (prop.format === 'date') return 'date';
+                    if (prop.format === 'date-time') return 'datetime-local';
+                    if (prop.format === 'email') return 'email';
+                    if (prop.format === 'uri' || prop.format === 'url') return 'url';
+                    return 'text';
+            }
+        }
+        
+        async function executeTool(toolName) {
+            const form = document.getElementById('tool-form');
+            const formData = new FormData(form);
+            const args = {};
+            
+            const tool = tools.find(t => t.name === toolName);
+            const schema = tool?.inputSchema || {};
+            const properties = schema.properties || {};
+            
+            for (const [key, value] of formData.entries()) {
+                const prop = properties[key] || {};
+                
+                if (prop.type === 'boolean') {
+                    args[key] = value === 'on';
+                } else if (prop.type === 'integer') {
+                    args[key] = value ? parseInt(value, 10) : null;
+                } else if (prop.type === 'number') {
+                    args[key] = value ? parseFloat(value) : null;
+                } else if (prop.type === 'array' || prop.type === 'object') {
+                    try {
+                        args[key] = value ? JSON.parse(value) : null;
+                    } catch (e) {
+                        showError('Invalid JSON for field: ' + key);
+                        return;
+                    }
+                } else {
+                    args[key] = value || null;
+                }
+            }
+            
+            // Handle unchecked checkboxes
+            for (const [name, prop] of Object.entries(properties)) {
+                if (prop.type === 'boolean' && !(name in args)) {
+                    args[name] = false;
+                }
+            }
+            
+            showLoading();
+            
+            try {
+                const result = await callMcp('tools/call', { name: toolName, arguments: args });
+                showResult(result);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+        
+        function showLoading() {
+            const container = document.getElementById('result-container');
+            container.innerHTML = `<div class="loading">
+                <div class="spinner"></div>
+                <span>Executing...</span>
+            </div>`;
+        }
+        
+        function showResult(result) {
+            const container = document.getElementById('result-container');
+            const json = JSON.stringify(result, null, 2);
+            container.innerHTML = `<div class="result success">
+                <pre>${escapeHtml(json)}</pre>
+            </div>`;
+        }
+        
+        function showError(message) {
+            const container = document.getElementById('result-container');
+            container.innerHTML = `<div class="result error">
+                <pre>${escapeHtml(message)}</pre>
+            </div>`;
+        }
+        
+        function clearResult() {
+            document.getElementById('result-container').innerHTML = '';
+        }
+        
+        function showEmptyState() {
+            const container = document.getElementById('tool-container');
+            container.innerHTML = `<div class="empty-state">
+                <p>No tools available</p>
+            </div>`;
+        }
+        
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('header').innerHTML = `<h1>${escapeHtml(CONFIG.title)}</h1>`;
+            loadTools();
+        });
+    })();
+    </script>
+</body>
+</html>
