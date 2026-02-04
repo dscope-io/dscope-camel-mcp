@@ -10,15 +10,19 @@ import org.apache.camel.Exchange;
 import io.dscope.camel.mcp.processor.AbstractMcpResponseProcessor;
 
 /**
- * Sample tools/call processor supporting two built-in demo tools (echo, summarize)
- * and delegating any other tool name to the resource request/response flow
- * (SampleResourceRequestProcessor + SampleResourceResponseProcessor).
+ * Sample processor that handles tools/call method.
+ * 
+ * <p>Supports two built-in demo tools:
+ * <ul>
+ *   <li><b>echo</b> - Returns the input text unchanged</li>
+ *   <li><b>summarize</b> - Truncates text to a maximum number of words</li>
+ * </ul>
+ * 
+ * <p>This demonstrates the recommended pattern: extend {@link AbstractMcpResponseProcessor}
+ * and use {@link #writeResult(Exchange, Object)} to write JSON-RPC responses.
  */
 @BindToRegistry("sampleToolCallProcessor")
 public class SampleToolCallProcessor extends AbstractMcpResponseProcessor {
-
-    private final SampleResourceRequestProcessor resourceRequest = new SampleResourceRequestProcessor();
-    private final SampleResourceResponseProcessor resourceResponse = new SampleResourceResponseProcessor();
 
     @Override
     protected void handleResponse(Exchange exchange) throws Exception {
@@ -31,18 +35,9 @@ public class SampleToolCallProcessor extends AbstractMcpResponseProcessor {
 
         switch (toolName) {
             case "echo" -> writeResult(exchange, handleEcho(params));
-            case "summarize", "summary" -> writeResult(exchange, handleSummarize(params)); // support alias
-            default -> delegateToResourceProcessors(exchange, params, toolName);
+            case "summarize", "summary" -> writeResult(exchange, handleSummarize(params));
+            default -> throw new IllegalArgumentException("Unknown tool: " + toolName);
         }
-    }
-
-    private void delegateToResourceProcessors(Exchange exchange, Map<String, Object> params, String toolName) throws Exception {
-        // Treat any unknown tool as a resource lookup; the specific tool name isn't
-        // used by the resource processors, which rely on the 'resource' argument.
-        // This allows Kamelet users to define additional resource-oriented tool names
-        // without changing Java code.
-        resourceRequest.process(exchange); // extracts resource name (defaults internally)
-        resourceResponse.process(exchange); // writes MCP result envelope
     }
 
     private Map<String, Object> handleEcho(Map<String, Object> arguments) {

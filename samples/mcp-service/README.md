@@ -72,7 +72,7 @@ Declared in `src/main/resources/mcp/methods.yaml`:
 
 Dynamic resource fallback:
 
-Any other tool name sent to `tools/call` is treated as a resource lookup. The request's `arguments.resource` (default `example-resource`) is loaded from `classpath:data/<resource>.json` and returned as the result. This logic lives in `SampleToolCallProcessor` delegating to `SampleResourceRequestProcessor` and `SampleResourceResponseProcessor`. If the JSON file is missing you'll receive an error.
+Any other tool name sent to `tools/call` is treated as a resource lookup. The request's `arguments.resource` (default `example-resource`) is loaded from `classpath:data/<resource>.json` and returned as the result. This logic lives in `SampleToolCallProcessor` which delegates to `SampleResourcesGetProcessor`. If the JSON file is missing you'll receive an error.
 
 Examples:
 
@@ -80,16 +80,19 @@ Examples:
 # echo
 curl -s http://localhost:8080/mcp \
 	-H 'Content-Type: application/json' \
+	-H 'Accept: application/json, text/event-stream' \
 	-d '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"echo","arguments":{"text":"Hello MCP"}}}'
 
 # summarize (alias: summary)
 curl -s http://localhost:8080/mcp \
 	-H 'Content-Type: application/json' \
+	-H 'Accept: application/json, text/event-stream' \
 	-d '{"jsonrpc":"2.0","id":"2","method":"tools/call","params":{"name":"summarize","arguments":{"text":"A long string of words that will be shortened","maxWords":5}}}'
 
 # resource fallback (tool name not explicitly declared)
 curl -s http://localhost:8080/mcp \
 	-H 'Content-Type: application/json' \
+	-H 'Accept: application/json, text/event-stream' \
 	-d '{"jsonrpc":"2.0","id":"3","method":"tools/call","params":{"name":"resource","arguments":{"resource":"example-resource"}}}'
 ```
 
@@ -98,6 +101,7 @@ List tools:
 ```bash
 curl -s http://localhost:8080/mcp \
 	-H 'Content-Type: application/json' \
+	-H 'Accept: application/json, text/event-stream' \
 	-d '{"jsonrpc":"2.0","id":"10","method":"tools/list","params":{}}'
 ```
 
@@ -106,6 +110,7 @@ Ping:
 ```bash
 curl -s http://localhost:8080/mcp \
 	-H 'Content-Type: application/json' \
+	-H 'Accept: application/json, text/event-stream' \
 	-d '{"jsonrpc":"2.0","id":"11","method":"ping","params":{}}'
 ```
 

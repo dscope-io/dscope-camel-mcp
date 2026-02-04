@@ -59,9 +59,7 @@
               - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'"
                 steps:
                   - process:
-                      ref: sampleResourceRequest
-                  - process:
-                      ref: sampleResourceResponse
+                      ref: sampleResourcesGet
               - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/list'"
                 steps:
                   - process:

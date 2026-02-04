@@ -34,7 +34,6 @@ public final class McpServiceApplication extends McpComponentApplicationSupport 
     @Override
     protected void bindAdditionalBeans(Main main) {
         main.bind("sampleToolCallProcessor", new SampleToolCallProcessor());
-        main.bind("sampleResourceRequest", new SampleResourceRequestProcessor());
-        main.bind("sampleResourceResponse", new SampleResourceResponseProcessor());
+        main.bind("sampleResourcesGet", new SampleResourcesGetProcessor());
     }
 }

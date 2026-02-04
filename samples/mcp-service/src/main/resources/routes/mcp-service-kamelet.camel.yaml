@@ -1,7 +1,7 @@
 - route:
     id: mcp-rest-service-kamelet
     from:
-      uri: "kamelet:mcp-rest-service?restHost=0.0.0.0&restPort=8080&restContextPath=/mcp&toolsCallBean=sampleToolCallProcessor"
+      uri: "kamelet:mcp-rest-service?restHost=0.0.0.0&restPort=8080&restContextPath=/mcp&toolsCallBean=sampleToolCallProcessor&resourcesGetBean=sampleResourcesGet"
       steps:
         - log:
             message: "MCP REST Service Kamelet invoked on http://0.0.0.0:8080/mcp"
@@ -9,7 +9,7 @@
 - route:
     id: mcp-ws-service-kamelet
     from:
-      uri: "kamelet:mcp-ws-service?wsHost=0.0.0.0&wsPort=8090&wsPath=/mcp&toolsCallBean=sampleToolCallProcessor"
+      uri: "kamelet:mcp-ws-service?wsHost=0.0.0.0&wsPort=8090&wsPath=/mcp&toolsCallBean=sampleToolCallProcessor&resourcesGetBean=sampleResourcesGet"
       steps:
         - log:
             message: "MCP WS Service Kamelet invoked on ws://0.0.0.0:8090/mcp"

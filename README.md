@@ -6,8 +6,8 @@
 
 | Channel | Version | Maven Coordinate | Notes |
 | --- | --- | --- | --- |
-| Latest Release | 1.0.0 | `io.dscope.camel:camel-mcp:1.0.0` | Recommended for production use |
-| Development Snapshot | 1.0.0 | `io.dscope.camel:camel-mcp:1.0.0` | Build from source (`mvn install`) to track `main` |
+| Latest Release | 1.1.0 | `io.dscope.camel:camel-mcp:1.1.0` | Recommended for production use |
+| Development Snapshot | 1.1.0 | `io.dscope.camel:camel-mcp:1.1.0` | Build from source (`mvn install`) to track `main` |
 
 ## 📋 Requirements
 
@@ -30,7 +30,7 @@
 <dependency>
   <groupId>io.dscope.camel</groupId>
   <artifactId>camel-mcp</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
@@ -89,6 +89,11 @@ The exchange body should be a `Map` representing MCP `params`. The producer enri
 
 ### Resources/Get With Sample Service
 
+The `resources/get` method supports automatic content type detection:
+- **Binary** (images, PDFs, fonts) → returned as base64 `blob`
+- **Text** (html, css, js, md) → returned as `text` with MIME type
+- **JSON** (no extension) → returned as structured data
+
 ```yaml
 - route:
     id: example-resources-client
@@ -114,6 +119,12 @@ The exchange body should be a `Map` representing MCP `params`. The producer enri
 ## 🤖 MCP Tooling
 
 - `AbstractMcpRequestProcessor` and `AbstractMcpResponseProcessor` provide templates for custom tool handlers.
+- `McpResourcesGetProcessor` handles resource loading with automatic content type detection and helper methods:
+  - `isBinaryResource(name)` / `isTextResource(name)` — check content type
+  - `getMimeType(name)` — resolve MIME type from extension
+  - `blobResource(uri, mimeType, bytes)` — create binary response
+  - `textResource(uri, mimeType, content)` — create text response
+  - `jsonResource(uri, data)` — create JSON response
 - `McpNotificationProcessor` normalizes JSON-RPC notifications and exchange properties.
 - Tool catalogs load from `classpath:mcp/methods.yaml` and feed `tools/list` responses automatically.
 
@@ -138,9 +149,19 @@ mvn -f samples/mcp-service/pom.xml exec:java
 When the sample is running you can exercise the MCP HTTP endpoint:
 
 ```bash
-curl -s \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"res-1","method":"resources/get","params":{"resource":"example-resource"}}' \
+# JSON resource (no extension)
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"resources/get","params":{"resource":"example-resource"}}' \
+  http://localhost:8080/mcp
+
+# HTML resource
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"2","method":"resources/get","params":{"resource":"sample.html"}}' \
+  http://localhost:8080/mcp
+
+# Binary image resource
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"3","method":"resources/get","params":{"resource":"sample-image.jpg"}}' \
   http://localhost:8080/mcp
 ```
 

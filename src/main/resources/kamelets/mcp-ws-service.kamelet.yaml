@@ -32,16 +32,16 @@ spec:
         description: Path for the MCP WebSocket (no trailing slash).
         type: string
         default: /mcp
-      enableResources:
-        title: Enable Resource Methods
-        description: Whether to enable sample resources/get request/response processors.
-        type: boolean
-        default: true
       toolsCallBean:
         title: Tools Call Bean
         description: Bean that handles tools/call requests.
         type: string
         default: sampleToolCallProcessor
+      resourcesGetBean:
+        title: Resources Get Bean
+        description: Bean that handles resources/get requests.
+        type: string
+        default: mcpResourcesGet
   dependencies:
     - "camel:{{wsComponent}}"
     - "camel:undertow"
@@ -56,6 +56,8 @@ spec:
         type: io.dscope.camel.mcp.processor.McpPingProcessor
       - name: mcpToolsList
         type: io.dscope.camel.mcp.processor.McpToolsListProcessor
+      - name: mcpResourcesGet
+        type: io.dscope.camel.mcp.processor.McpResourcesGetProcessor
       - name: mcpStream
         type: io.dscope.camel.mcp.processor.McpStreamProcessor
       - name: mcpHealthStatus
@@ -102,6 +104,12 @@ spec:
               - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/call'"
                 steps:
                   - to: "bean:{{toolsCallBean}}"
+              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'resources/get'"
+                steps:
+                  - log:
+                      loggingLevel: INFO
+                      message: "MCP Resources Get request received"
+                  - to: "bean:{{resourcesGetBean}}"
             otherwise:
               steps:
                 - setProperty: { name: mcp.error.code, constant: "-32601" }

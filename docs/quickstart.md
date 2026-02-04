@@ -22,14 +22,29 @@ To run only the WebSocket routes, add `-Dcamel.main.routesIncludePattern=classpa
 
 ## Call `resources/get`
 
+The service auto-detects content type based on file extension:
+
 ```bash
-curl -s \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"res-1","method":"resources/get","params":{"resource":"example-resource"}}' \
+# JSON resource (no extension → loads .json file)
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"resources/get","params":{"resource":"example-resource"}}' \
+  http://localhost:8080/mcp | jq '.'
+
+# Text resource (html, css, js, md, etc.)
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"2","method":"resources/get","params":{"resource":"sample.html"}}' \
+  http://localhost:8080/mcp | jq '.'
+
+# Binary resource (images, PDFs, fonts → base64 encoded)
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"3","method":"resources/get","params":{"resource":"sample-image.jpg"}}' \
   http://localhost:8080/mcp | jq '.'
 ```
 
-The final `jq` is optional but helpful for pretty-printing the JSON response. The service responds with the payload stored in `samples/mcp-service/src/main/resources/data/example-resource.json`.
+Resources are loaded from `samples/mcp-service/src/main/resources/data/`. The response format varies by type:
+- **Binary**: `{"uri": "...", "mimeType": "image/jpeg", "blob": "base64..."}`
+- **Text**: `{"uri": "...", "mimeType": "text/html", "text": "content..."}`
+- **JSON**: Direct structured data
 
 ## Call `resources/get` over WebSocket
 
