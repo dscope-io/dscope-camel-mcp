@@ -136,13 +136,10 @@ public class McpResourcesReadProcessor extends AbstractMcpResponseProcessor {
         }
         try {
             String configJson = OBJECT_MAPPER.writeValueAsString(config);
-            // Replace the CONFIG object initialization with merged config
+            // Replace the CONFIG closing to merge with user config (user config wins)
             return html.replace(
-                    "const CONFIG = {",
-                    "const CONFIG = Object.assign(" + configJson + ", {"
-            ).replace(
                     "};  // END CONFIG",
-                    "});  // END CONFIG"
+                    "}, " + configJson + ");  // END CONFIG"
             );
         } catch (Exception e) {
             LOG.warn("Failed to inject config into UI", e);
