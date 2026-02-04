@@ -171,26 +171,36 @@ Resources are loaded from `samples/mcp-service/src/main/resources/data/`. The re
 - **Text**: `{"uri": "...", "mimeType": "text/html", "text": "content..."}`
 - **JSON**: Direct structured data
 
-## Calling Methods over WebSocket
+## WebSocket Transport
+
+WebSocket provides persistent, bidirectional connections ideal for agent sessions.
+
+### Connecting
 
 ```bash
+# Using wscat (install: npm install -g wscat)
 npx wscat -c ws://localhost:8090/mcp
+
+# Using websocat
+websocat ws://localhost:8090/mcp
 ```
 
-Once connected, send JSON-RPC messages:
+### Interactive Session
+
+Once connected, send JSON-RPC messages (lines starting with `>` are sent, `<` are received):
 
 ```
-# Initialize session
+# Initialize session (required first)
 > {"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"ws-client","version":"1.0.0"}}}
-< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{...}}}
+< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.1.0"}}}
 
-# Ping
+# Ping (health check)
 > {"jsonrpc":"2.0","id":"2","method":"ping"}
 < {"jsonrpc":"2.0","id":"2","result":{}}
 
-# List tools
+# List available tools
 > {"jsonrpc":"2.0","id":"3","method":"tools/list"}
-< {"jsonrpc":"2.0","id":"3","result":{"tools":[...]}}
+< {"jsonrpc":"2.0","id":"3","result":{"tools":[{"name":"echo",...}]}}
 
 # Call a tool
 > {"jsonrpc":"2.0","id":"4","method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello"}}}
@@ -198,6 +208,61 @@ Once connected, send JSON-RPC messages:
 
 # Get a resource
 > {"jsonrpc":"2.0","id":"5","method":"resources/get","params":{"resource":"example-resource"}}
+< {"jsonrpc":"2.0","id":"5","result":{"name":"example-resource",...}}
+```
+
+### Python Client Example
+
+```python
+import asyncio
+import websockets
+import json
+
+async def mcp_session():
+    async with websockets.connect('ws://localhost:8090/mcp') as ws:
+        # Initialize
+        await ws.send(json.dumps({
+            "jsonrpc": "2.0", "id": "1", "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05", 
+                       "clientInfo": {"name": "py-client", "version": "1.0.0"}}
+        }))
+        print("Init:", await ws.recv())
+        
+        # Call a tool
+        await ws.send(json.dumps({
+            "jsonrpc": "2.0", "id": "2", "method": "tools/call",
+            "params": {"name": "echo", "arguments": {"message": "Hello"}}
+        }))
+        print("Tool result:", await ws.recv())
+
+asyncio.run(mcp_session())
+```
+
+### JavaScript/Node.js Client Example
+
+```javascript
+const WebSocket = require('ws');
+const ws = new WebSocket('ws://localhost:8090/mcp');
+
+ws.on('open', () => {
+    ws.send(JSON.stringify({
+        jsonrpc: "2.0", id: "1", method: "initialize",
+        params: { protocolVersion: "2024-11-05",
+                  clientInfo: { name: "node-client", version: "1.0.0" }}
+    }));
+});
+
+ws.on('message', (data) => console.log('Received:', JSON.parse(data)));
+```
+
+### WebSocket-Only Mode
+
+To run only WebSocket routes (no HTTP):
+
+```bash
+mvn -f samples/mcp-service/pom.xml exec:java \
+  -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.camel.yaml
+```
 < {"jsonrpc":"2.0","id":"5","result":{"name":"example-resource",...}}
 ```
 

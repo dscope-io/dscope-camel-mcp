@@ -67,6 +67,44 @@ Returns resource content (format depends on type - see below).
 
 - **`tools/list`** and **`tools/call`** serve tool definitions and executions. Tool metadata loads from `classpath:mcp/methods.yaml`.
 
+## Transport Layer
+
+The component supports two transport protocols:
+
+### HTTP Transport
+
+- **Endpoint**: `POST http://host:8080/mcp`
+- **Pattern**: Request/response
+- **Use case**: Simple integrations, REST-style clients, stateless requests
+- **Route file**: `mcp-http-service.camel.yaml`
+
+### WebSocket Transport
+
+- **Endpoint**: `ws://host:8090/mcp`
+- **Pattern**: Persistent bidirectional connection
+- **Use case**: Agent sessions, streaming, real-time notifications
+- **Route file**: `mcp-ws-service.camel.yaml`
+
+WebSocket configuration via Undertow:
+
+```yaml
+from:
+  uri: "undertow:ws://0.0.0.0:8090/mcp?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+```
+
+| Option | Value | Purpose |
+|--------|-------|--------|
+| `sendToAll` | `false` | Response goes only to originating client |
+| `allowedOrigins` | `*` | CORS policy (restrict in production) |
+| `exchangePattern` | `InOut` | Enable request/response semantics |
+
+Both transports share the same processor pipeline:
+1. `mcpRequestSizeGuard` - Validates request size limits
+2. `mcpRateLimit` - Applies rate limiting
+3. `mcpJsonRpcEnvelope` - Parses JSON-RPC envelope, extracts method
+4. Choice block - Routes to method-specific processor
+5. Response serialization
+
 ## Extensibility
 
 Both the library and sample service reuse the same base classes (`AbstractMcpRequestProcessor`, `AbstractMcpResponseProcessor`) so you can plug in custom logic while keeping JSON-RPC framing consistent. These building blocks let you extend MCP coverage with your own processors while reusing the shared HTTP transport and JSON serialization.

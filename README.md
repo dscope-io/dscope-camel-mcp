@@ -57,7 +57,112 @@ mcp:http://host:port/mcp?method=tools/list
 
 The exchange body should be a `Map` representing MCP `params`. The producer enriches it with `jsonrpc`, `id`, and the configured `method` before invoking the downstream HTTP endpoint.
 
-## 📚 Usage Examples
+## � WebSocket Transport
+
+The component supports WebSocket connections for persistent, bidirectional MCP sessions. This is ideal for:
+- Long-running agent sessions
+- Streaming responses
+- Real-time notifications
+
+### Endpoints
+
+| Protocol | Endpoint | Purpose |
+|----------|----------|--------|
+| HTTP | `http://localhost:8080/mcp` | Request/response style |
+| WebSocket | `ws://localhost:8090/mcp` | Persistent bidirectional |
+
+### WebSocket Route Configuration
+
+The sample service configures WebSocket via Undertow:
+
+```yaml
+- route:
+    id: mcp-service-ws
+    from:
+      uri: "undertow:ws://0.0.0.0:8090/mcp?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+```
+
+| Option | Default | Purpose |
+|--------|---------|--------|
+| `sendToAll` | `false` | Send response only to originating client |
+| `allowedOrigins` | `*` | CORS allowed origins (use specific domains in production) |
+| `exchangePattern` | `InOut` | Enable request/response pattern |
+
+### Connecting with wscat
+
+```bash
+# Install wscat (one-time)
+npm install -g wscat
+
+# Connect to MCP WebSocket
+npx wscat -c ws://localhost:8090/mcp
+```
+
+### Alternative WebSocket Clients
+
+- **websocat**: `websocat ws://localhost:8090/mcp`
+- **VS Code**: Install "WebSocket Client" extension
+- **Postman**: Import WebSocket collection from `samples/mcp-service/postman/`
+- **Python**: Use `websockets` library
+- **JavaScript**: Native `WebSocket` API or `ws` package
+
+### Python Example
+
+```python
+import asyncio
+import websockets
+import json
+
+async def mcp_client():
+    async with websockets.connect('ws://localhost:8090/mcp') as ws:
+        # Initialize session
+        await ws.send(json.dumps({
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "clientInfo": {"name": "python-client", "version": "1.0.0"}
+            }
+        }))
+        print(await ws.recv())
+        
+        # List tools
+        await ws.send(json.dumps({
+            "jsonrpc": "2.0",
+            "id": "2",
+            "method": "tools/list"
+        }))
+        print(await ws.recv())
+
+asyncio.run(mcp_client())
+```
+
+### JavaScript/Node.js Example
+
+```javascript
+const WebSocket = require('ws');
+const ws = new WebSocket('ws://localhost:8090/mcp');
+
+ws.on('open', () => {
+    // Initialize session
+    ws.send(JSON.stringify({
+        jsonrpc: "2.0",
+        id: "1",
+        method: "initialize",
+        params: {
+            protocolVersion: "2024-11-05",
+            clientInfo: { name: "node-client", version: "1.0.0" }
+        }
+    }));
+});
+
+ws.on('message', (data) => {
+    console.log('Received:', JSON.parse(data));
+});
+```
+
+## �📚 Usage Examples
 
 ### Calling MCP Methods via curl
 
