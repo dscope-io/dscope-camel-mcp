@@ -24,10 +24,12 @@ To run only the WebSocket routes, add `-Dcamel.main.routesIncludePattern=classpa
 
 All MCP methods use JSON-RPC 2.0 format over HTTP (`POST http://localhost:8080/mcp`) or WebSocket (`ws://localhost:8090/mcp`).
 
+> **Note:** The MCP Streamable HTTP transport requires the Accept header to include both `application/json` and `text/event-stream`.
+
 ### `initialize` - Start an MCP session
 
 ```bash
-curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{
     "jsonrpc": "2.0",
     "id": "init-1",
@@ -66,7 +68,7 @@ Response:
 ### `ping` - Health check
 
 ```bash
-curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc": "2.0", "id": "ping-1", "method": "ping"}' \
   http://localhost:8080/mcp | jq '.'
 ```
@@ -83,7 +85,7 @@ Response:
 ### `tools/list` - List available tools
 
 ```bash
-curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc": "2.0", "id": "tools-1", "method": "tools/list"}' \
   http://localhost:8080/mcp | jq '.'
 ```
@@ -114,7 +116,7 @@ Response:
 ### `resources/list` - List available resources
 
 ```bash
-curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc": "2.0", "id": "res-list-1", "method": "resources/list"}' \
   http://localhost:8080/mcp | jq '.'
 ```
@@ -146,7 +148,7 @@ Response:
 ### `tools/call` - Execute a tool
 
 ```bash
-curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{
     "jsonrpc": "2.0",
     "id": "call-1",

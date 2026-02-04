@@ -1,6 +1,6 @@
 # MCP Service Sample
 
-This sample hosts both HTTP and WebSocket MCP services using the Camel MCP component. The HTTP route binds processors to Undertow HTTP endpoints; the WebSocket route reuses them over Undertow's WS support. Both flows expose the MCP JSON-RPC methods: `initialize`, `ping`, `resources/get`, `tools/list`, `tools/call`, plus notifications (e.g. `notifications/initialized`). Tool metadata is loaded from `src/main/resources/mcp/methods.yaml`.
+This sample hosts both HTTP and WebSocket MCP services using the Camel MCP component. The HTTP route binds processors to Undertow HTTP endpoints; the WebSocket route reuses them over Undertow's WS support. Both flows expose the MCP JSON-RPC methods: `initialize`, `ping`, `resources/list`, `resources/get`, `tools/list`, `tools/call`, plus notifications (e.g. `notifications/initialized`). Tool metadata is loaded from `src/main/resources/mcp/methods.yaml` and resource metadata from `src/main/resources/mcp/resources.yaml`.
 
 ## Prerequisites
 
@@ -103,6 +103,15 @@ curl -s http://localhost:8080/mcp \
 	-H 'Content-Type: application/json' \
 	-H 'Accept: application/json, text/event-stream' \
 	-d '{"jsonrpc":"2.0","id":"10","method":"tools/list","params":{}}'
+```
+
+List resources:
+
+```bash
+curl -s http://localhost:8080/mcp \
+	-H 'Content-Type: application/json' \
+	-H 'Accept: application/json, text/event-stream' \
+	-d '{"jsonrpc":"2.0","id":"12","method":"resources/list"}'
 ```
 
 Ping:

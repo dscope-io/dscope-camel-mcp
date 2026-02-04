@@ -90,6 +90,7 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
         switch (method) {
             case "initialize" -> handleInitialize(exchange, params);
             case "ping" -> handlePing(exchange, params);
+            case "resources/list" -> handleResourcesList(exchange, params);
             case "resources/get" -> handleResourcesGet(exchange, params);
             case "tools/list" -> handleToolsList(exchange, params);
             case "tools/call" -> handleToolsCall(exchange, params);
@@ -114,6 +115,10 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
     }
 
     private void handleToolsList(Exchange exchange, Map<String, Object> params) {
+        exchange.getIn().setBody(params == null ? Map.of() : params);
+    }
+
+    private void handleResourcesList(Exchange exchange, Map<String, Object> params) {
         exchange.getIn().setBody(params == null ? Map.of() : params);
     }
 

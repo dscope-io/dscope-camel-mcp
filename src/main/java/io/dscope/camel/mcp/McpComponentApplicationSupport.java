@@ -14,6 +14,7 @@ import io.dscope.camel.mcp.processor.McpNotificationsInitializedProcessor;
 import io.dscope.camel.mcp.processor.McpPingProcessor;
 import io.dscope.camel.mcp.processor.McpRateLimitProcessor;
 import io.dscope.camel.mcp.processor.McpRequestSizeGuardProcessor;
+import io.dscope.camel.mcp.processor.McpResourcesListProcessor;
 import io.dscope.camel.mcp.processor.McpStreamProcessor;
 import io.dscope.camel.mcp.processor.McpToolsListProcessor;
 
@@ -33,6 +34,7 @@ public abstract class McpComponentApplicationSupport {
     private final McpNotificationProcessor notification = new McpNotificationProcessor();
     private final McpNotificationAckProcessor notificationAck = new McpNotificationAckProcessor();
     private final McpToolsListProcessor toolsList = new McpToolsListProcessor(methodCatalog);
+    private final McpResourcesListProcessor resourcesList = new McpResourcesListProcessor();
     private final McpErrorProcessor error = new McpErrorProcessor();
     private final McpStreamProcessor stream = new McpStreamProcessor();
     private final McpHealthStatusProcessor healthStatus = new McpHealthStatusProcessor(rateLimit);
@@ -84,6 +86,7 @@ public abstract class McpComponentApplicationSupport {
         main.bind("mcpNotification", notification);
         main.bind("mcpNotificationAck", notificationAck);
         main.bind("mcpToolsList", toolsList);
+        main.bind("mcpResourcesList", resourcesList);
         main.bind("mcpError", error);
         main.bind("mcpStream", stream);
         main.bind("mcpHealthStatus", healthStatus);
