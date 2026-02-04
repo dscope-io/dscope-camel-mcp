@@ -59,7 +59,107 @@ The exchange body should be a `Map` representing MCP `params`. The producer enri
 
 ## 📚 Usage Examples
 
-### Minimal YAML Client
+### Calling MCP Methods via curl
+
+All MCP methods use JSON-RPC 2.0 format. Here's how to call each supported method:
+
+#### `initialize` - Start an MCP session
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "clientInfo": {
+        "name": "my-client",
+        "version": "1.0.0"
+      },
+      "capabilities": {}
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `ping` - Health check
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "2", "method": "ping"}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `tools/list` - List available tools
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "3", "method": "tools/list"}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `tools/call` - Execute a tool
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "4",
+    "method": "tools/call",
+    "params": {
+      "name": "echo",
+      "arguments": {
+        "message": "Hello from MCP!"
+      }
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `resources/get` - Fetch a resource
+
+```bash
+# JSON resource
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "5",
+    "method": "resources/get",
+    "params": {
+      "resource": "example-resource"
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+
+# Binary resource (returns base64)
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "6", "method": "resources/get", "params": {"resource": "sample-image.jpg"}}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+### Calling MCP Methods via WebSocket
+
+```bash
+npx wscat -c ws://localhost:8090/mcp
+
+# Initialize
+> {"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"ws-client","version":"1.0.0"}}}
+
+# Ping
+> {"jsonrpc":"2.0","id":"2","method":"ping"}
+
+# List tools
+> {"jsonrpc":"2.0","id":"3","method":"tools/list"}
+
+# Call a tool
+> {"jsonrpc":"2.0","id":"4","method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello"}}}
+
+# Get a resource
+> {"jsonrpc":"2.0","id":"5","method":"resources/get","params":{"resource":"example-resource"}}
+```
+
+### Minimal YAML Client (Camel Route)
 
 ```yaml
 - route:

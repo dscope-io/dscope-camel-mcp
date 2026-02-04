@@ -20,7 +20,132 @@ mvn -f samples/mcp-service/pom.xml exec:java
 
 To run only the WebSocket routes, add `-Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml` to the command. Running `mvn package` in the same module generates `samples/mcp-service/target/openapi/mcp-service.yaml`, and tool metadata comes from `samples/mcp-service/src/main/resources/mcp/methods.yaml`.
 
-## Call `resources/get`
+## Calling MCP Methods
+
+All MCP methods use JSON-RPC 2.0 format over HTTP (`POST http://localhost:8080/mcp`) or WebSocket (`ws://localhost:8090/mcp`).
+
+### `initialize` - Start an MCP session
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "init-1",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "clientInfo": {
+        "name": "my-client",
+        "version": "1.0.0"
+      },
+      "capabilities": {}
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "init-1",
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "serverInfo": {
+      "name": "camel-mcp-server",
+      "version": "1.1.0"
+    },
+    "capabilities": {
+      "tools": { "listChanged": true },
+      "resources": { "subscribe": false, "listChanged": false }
+    }
+  }
+}
+```
+
+### `ping` - Health check
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "ping-1", "method": "ping"}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "ping-1",
+  "result": {}
+}
+```
+
+### `tools/list` - List available tools
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "tools-1", "method": "tools/list"}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "tools-1",
+  "result": {
+    "tools": [
+      {
+        "name": "echo",
+        "description": "Returns the input message",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string" }
+          },
+          "required": ["message"]
+        }
+      }
+    ]
+  }
+}
+```
+
+### `tools/call` - Execute a tool
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "call-1",
+    "method": "tools/call",
+    "params": {
+      "name": "echo",
+      "arguments": {
+        "message": "Hello from MCP!"
+      }
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "call-1",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Hello from MCP!"
+      }
+    ]
+  }
+}
+```
+
+### `resources/get` - Fetch a resource
 
 The service auto-detects content type based on file extension:
 
@@ -46,15 +171,37 @@ Resources are loaded from `samples/mcp-service/src/main/resources/data/`. The re
 - **Text**: `{"uri": "...", "mimeType": "text/html", "text": "content..."}`
 - **JSON**: Direct structured data
 
-## Call `resources/get` over WebSocket
+## Calling Methods over WebSocket
 
 ```bash
 npx wscat -c ws://localhost:8090/mcp
-> {"jsonrpc":"2.0","id":"ws-1","method":"resources/get","params":{"resource":"example-resource"}}
-< {"jsonrpc":"2.0","id":"ws-1","result":{"name":"example-resource","description":"Sample resource","chunks":[]}}
 ```
 
-If you prefer another client, tools like `websocat` or the `VS Code WebSocket Client` extension work equally well.
+Once connected, send JSON-RPC messages:
+
+```
+# Initialize session
+> {"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"ws-client","version":"1.0.0"}}}
+< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{...}}}
+
+# Ping
+> {"jsonrpc":"2.0","id":"2","method":"ping"}
+< {"jsonrpc":"2.0","id":"2","result":{}}
+
+# List tools
+> {"jsonrpc":"2.0","id":"3","method":"tools/list"}
+< {"jsonrpc":"2.0","id":"3","result":{"tools":[...]}}
+
+# Call a tool
+> {"jsonrpc":"2.0","id":"4","method":"tools/call","params":{"name":"echo","arguments":{"message":"Hello"}}}
+< {"jsonrpc":"2.0","id":"4","result":{"content":[{"type":"text","text":"Hello"}]}}
+
+# Get a resource
+> {"jsonrpc":"2.0","id":"5","method":"resources/get","params":{"resource":"example-resource"}}
+< {"jsonrpc":"2.0","id":"5","result":{"name":"example-resource",...}}
+```
+
+Alternative clients: `websocat`, VS Code WebSocket Client extension, or any WebSocket library.
 
 ## Test with Postman
 
