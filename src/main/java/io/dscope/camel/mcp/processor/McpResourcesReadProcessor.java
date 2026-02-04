@@ -139,7 +139,7 @@ public class McpResourcesReadProcessor extends AbstractMcpResponseProcessor {
             // Use spread operator to merge config at end (user config wins)
             return html.replace(
                     "};  // END CONFIG",
-                    ", ..." + configJson + "};  // END CONFIG"
+                    "..." + configJson + "};  // END CONFIG"
             );
         } catch (Exception e) {
             LOG.warn("Failed to inject config into UI", e);
