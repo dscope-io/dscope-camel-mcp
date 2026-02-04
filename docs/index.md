@@ -8,5 +8,6 @@ The **Camel MCP Component** brings the [Model Context Protocol (MCP)](https://mo
 
 ## Docs
 - [Quickstart](quickstart.md)
+- [Development Guide](development.md)
 - [Architecture](architecture.md)
 - [Publish Guide](PUBLISH_GUIDE.md)

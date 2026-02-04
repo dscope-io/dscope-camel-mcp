@@ -22,6 +22,8 @@
 - Ships registry processors for JSON-RPC envelopes, tool catalogs, and notification workflows.
 - Sample service and Postman collections to exercise MCP flows end-to-end.
 
+📖 **[Development Guide](docs/development.md)** - Learn how to build your own MCP services with YAML and Java routes.
+
 ## 🛠 Installation
 
 ### Maven Dependency (Release)
