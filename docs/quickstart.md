@@ -111,6 +111,38 @@ Response:
 }
 ```
 
+### `resources/list` - List available resources
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "res-list-1", "method": "resources/list"}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "res-list-1",
+  "result": {
+    "resources": [
+      {
+        "uri": "resource://data/example-resource",
+        "name": "example-resource",
+        "description": "Sample JSON resource with structured data.",
+        "mimeType": "application/json"
+      },
+      {
+        "uri": "resource://data/sample.html",
+        "name": "sample.html",
+        "description": "Sample HTML page.",
+        "mimeType": "text/html"
+      }
+    ]
+  }
+}
+```
+
 ### `tools/call` - Execute a tool
 
 ```bash

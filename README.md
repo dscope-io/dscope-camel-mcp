@@ -17,7 +17,7 @@
 
 ## 🚀 Features
 
-- Implements core MCP JSON-RPC methods: `initialize`, `ping`, `resources/get`, `tools/list`, and `tools/call`.
+- Implements core MCP JSON-RPC methods: `initialize`, `ping`, `resources/list`, `resources/get`, `tools/list`, and `tools/call`.
 - Sends MCP traffic over standard Camel HTTP clients and exposes WebSocket helpers for streaming scenarios.
 - Ships registry processors for JSON-RPC envelopes, tool catalogs, and notification workflows.
 - Sample service and Postman collections to exercise MCP flows end-to-end.
@@ -203,6 +203,14 @@ curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
 ```bash
 curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{"jsonrpc": "2.0", "id": "3", "method": "tools/list"}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `resources/list` - List available resources
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"jsonrpc": "2.0", "id": "4", "method": "resources/list"}' \
   http://localhost:8080/mcp | jq '.'
 ```
 

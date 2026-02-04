@@ -56,6 +56,10 @@
                 steps:
                   - process:
                       ref: mcpPing
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/list'"
+                steps:
+                  - process:
+                      ref: mcpResourcesList
               - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'"
                 steps:
                   - process:

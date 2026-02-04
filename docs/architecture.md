@@ -41,6 +41,12 @@ Executes a tool by name with provided arguments.
 
 Returns execution result in `content` array.
 
+### `resources/list`
+
+Lists all available resources the server exposes. No parameters required.
+
+Returns array of resource descriptors with `uri`, `name`, `description`, and `mimeType`.
+
 ### `resources/get`
 
 Fetches a resource by name or URI.
@@ -54,6 +60,8 @@ Returns resource content (format depends on type - see below).
 ## Method Processors
 
 - **`initialize`** and **`ping`** respond with canned results for connectivity checks.
+
+- **`resources/list`** returns the resource catalog loaded from `mcp/resources.yaml`. Each resource includes `uri`, `name`, `description`, and `mimeType`.
 
 - **`resources/get`** delegates to a configurable processor bean (default: `mcpResourcesGet`). The core `McpResourcesGetProcessor` provides:
   - Automatic content type detection (binary vs text vs JSON)

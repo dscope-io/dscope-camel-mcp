@@ -125,19 +125,25 @@ Create `src/main/resources/routes/mcp-service.camel.yaml`:
                       ref: mcpPing
               
               # List available tools
-              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/list'"
+              - simple: \"${exchangeProperty.mcp.jsonrpc.method} == 'tools/list'\"
                 steps:
                   - process:
                       ref: mcpToolsList
               
               # Execute a tool (use your custom processor)
-              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/call'"
+              - simple: \"${exchangeProperty.mcp.jsonrpc.method} == 'tools/call'\"
                 steps:
                   - process:
                       ref: myToolProcessor
               
+              # List available resources
+              - simple: \"${exchangeProperty.mcp.jsonrpc.method} == 'resources/list'\"
+                steps:
+                  - process:
+                      ref: mcpResourcesList
+              
               # Fetch a resource (use your custom processor)
-              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'"
+              - simple: \"${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'\"
                 steps:
                   - process:
                       ref: myResourceProcessor
@@ -448,6 +454,39 @@ methods:
         - math
 ```
 
+## Defining Resources (resources.yaml)
+
+Create `src/main/resources/mcp/resources.yaml` to define your resource catalog:
+
+```yaml
+resources:
+  - uri: "resource://data/config"
+    name: config
+    description: Application configuration settings.
+    mimeType: application/json
+
+  - uri: "resource://data/readme.md"
+    name: readme.md
+    description: Project documentation.
+    mimeType: text/markdown
+
+  - uri: "resource://data/logo.png"
+    name: logo.png
+    description: Application logo image.
+    mimeType: image/png
+
+  - uri: "resource://templates/email.html"
+    name: email.html
+    description: Email template.
+    mimeType: text/html
+```
+
+Each resource entry includes:
+- `uri` - Unique resource identifier
+- `name` - Human-readable name (used in `resources/get` requests)
+- `description` - Description for clients
+- `mimeType` - Content type
+
 ## Built-in Processors Reference
 
 The component provides these pre-registered processors:
@@ -458,11 +497,12 @@ The component provides these pre-registered processors:
 | `McpInitializeProcessor` | `mcpInitialize` | Handles `initialize` method |
 | `McpPingProcessor` | `mcpPing` | Handles `ping` health check |
 | `McpToolsListProcessor` | `mcpToolsList` | Returns tool catalog from `methods.yaml` |
+| `McpResourcesListProcessor` | `mcpResourcesList` | Returns resource catalog from `resources.yaml` |
+| `McpResourcesGetProcessor` | `mcpResourcesGet` | Base class for resource handling |
 | `McpErrorProcessor` | `mcpError` | Formats JSON-RPC error responses |
 | `McpNotificationProcessor` | `mcpNotification` | Handles notification messages |
 | `McpRequestSizeGuardProcessor` | `mcpRequestSizeGuard` | Validates request size limits |
 | `McpRateLimitProcessor` | `mcpRateLimit` | Applies rate limiting |
-| `McpResourcesGetProcessor` | `mcpResourcesGet` | Base class for resource handling |
 
 ## Base Processor Classes
 
