@@ -12,7 +12,7 @@ This guide explains how to build MCP services using the Camel MCP component. You
     <dependency>
         <groupId>io.dscope.camel</groupId>
         <artifactId>camel-mcp</artifactId>
-        <version>1.1.0</version>
+        <version>1.2.0</version>
     </dependency>
     
     <!-- Camel runtime -->
@@ -503,6 +503,10 @@ The component provides these pre-registered processors:
 | `McpNotificationProcessor` | `mcpNotification` | Handles notification messages |
 | `McpRequestSizeGuardProcessor` | `mcpRequestSizeGuard` | Validates request size limits |
 | `McpRateLimitProcessor` | `mcpRateLimit` | Applies rate limiting |
+| `McpUiInitializeProcessor` | `mcpUiInitialize` | Creates UI sessions |
+| `McpUiMessageProcessor` | `mcpUiMessage` | Handles UI messages |
+| `McpUiUpdateModelContextProcessor` | `mcpUiUpdateModelContext` | Updates model context |
+| `McpUiToolsCallProcessor` | `mcpUiToolsCall` | Validates session before tool execution |
 
 ## Base Processor Classes
 

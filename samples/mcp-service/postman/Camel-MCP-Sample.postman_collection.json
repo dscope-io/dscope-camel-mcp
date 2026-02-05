@@ -10,121 +10,360 @@
       "key": "base_url",
       "value": "http://localhost:8080",
       "type": "string"
+    },
+    {
+      "key": "ui_session_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
     {
-      "name": "Ping",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": {
-          "raw": "{{base_url}}/mcp",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "mcp"
-          ]
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ping-1\",\n  \"method\": \"ping\",\n  \"params\": {}\n}"
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Resources / Get (example-resource)",
-      "event": [
+      "name": "Core MCP",
+      "item": [
         {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": []
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": {
-          "raw": "{{base_url}}/mcp",
-          "host": [
-            "{{base_url}}"
+          "name": "Initialize",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Has server info', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result.serverInfo).to.exist;",
+                  "});"
+                ]
+              }
+            }
           ],
-          "path": [
-            "mcp"
-          ]
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"init-1\",\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-06-18\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman-client\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}"
+            }
+          },
+          "response": []
         },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"resource-1\",\n  \"method\": \"resources/get\",\n  \"params\": {\n    \"resource\": \"{{resource_name}}\"\n  }\n}"
+        {
+          "name": "Ping",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ping-1\",\n  \"method\": \"ping\",\n  \"params\": {}\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tools / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"tools-list-1\",\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tools / Call (echo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"echo-1\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"echo\",\n    \"arguments\": {\n      \"text\": \"Hello from Postman!\"\n    }\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tools / Call (summarize)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"summarize-1\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"summarize\",\n    \"arguments\": {\n      \"text\": \"The quick brown fox jumps over the lazy dog. This is a sample text that demonstrates the summarize tool functionality.\",\n      \"maxWords\": 10\n    }\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tools / Call (chart-editor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"chart-1\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"chart-editor\",\n    \"arguments\": {\n      \"chartType\": \"bar\",\n      \"title\": \"Sales 2024\",\n      \"data\": [25, 45, 30, 60, 80],\n      \"labels\": [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\"]\n    }\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resources / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"res-list-1\",\n  \"method\": \"resources/list\",\n  \"params\": {}\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resources / Get",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"res-get-1\",\n  \"method\": \"resources/get\",\n  \"params\": {\n    \"uri\": \"resource://data/chart-editor.html\"\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/mcp/health",
+              "host": ["{{base_url}}"],
+              "path": ["mcp", "health"]
+            }
+          },
+          "response": []
         }
-      },
-      "response": []
+      ]
     },
     {
-      "name": "Tools / List",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": {
-          "raw": "{{base_url}}/mcp",
-          "host": [
-            "{{base_url}}"
+      "name": "MCP Apps Bridge (UI)",
+      "item": [
+        {
+          "name": "UI / Initialize",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Has sessionId', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result.sessionId).to.exist;",
+                  "    pm.collectionVariables.set('ui_session_id', jsonData.result.sessionId);",
+                  "});"
+                ]
+              }
+            }
           ],
-          "path": [
-            "mcp"
-          ]
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ui-init-1\",\n  \"method\": \"ui/initialize\",\n  \"params\": {\n    \"clientInfo\": {\n      \"name\": \"postman-ui-client\",\n      \"version\": \"1.0.0\"\n    },\n    \"resourceUri\": \"mcp://resource/chart-editor.html\",\n    \"toolName\": \"chart-editor\"\n  }\n}"
+            }
+          },
+          "response": []
         },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"tools-list-1\",\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+        {
+          "name": "UI / Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ui-msg-1\",\n  \"method\": \"ui/message\",\n  \"params\": {\n    \"sessionId\": \"{{ui_session_id}}\",\n    \"type\": \"user-action\",\n    \"payload\": {\n      \"action\": \"chart-type-changed\",\n      \"newValue\": \"line\"\n    }\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "UI / Update Model Context",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ui-ctx-1\",\n  \"method\": \"ui/update-model-context\",\n  \"params\": {\n    \"sessionId\": \"{{ui_session_id}}\",\n    \"context\": {\n      \"chartConfig\": {\n        \"type\": \"bar\",\n        \"data\": [10, 20, 30, 40, 50]\n      },\n      \"lastModified\": \"2024-01-15T10:30:00Z\"\n    },\n    \"mode\": \"merge\"\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "UI / Tools Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ui-call-1\",\n  \"method\": \"ui/tools/call\",\n  \"params\": {\n    \"sessionId\": \"{{ui_session_id}}\",\n    \"name\": \"echo\",\n    \"arguments\": {\n      \"text\": \"Called from embedded UI!\"\n    }\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "UI / Invalid Session (Error Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"ui-err-1\",\n  \"method\": \"ui/message\",\n  \"params\": {\n    \"sessionId\": \"00000000-0000-0000-0000-000000000000\",\n    \"type\": \"test\",\n    \"payload\": {}\n  }\n}"
+            }
+          },
+          "response": []
         }
-      },
-      "response": []
+      ]
     },
     {
-      "name": "Tools / Call (sample tool)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": {
-          "raw": "{{base_url}}/mcp",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "mcp"
-          ]
+      "name": "Error Handling",
+      "item": [
+        {
+          "name": "Invalid Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"err-1\",\n  \"method\": \"invalid/method\",\n  \"params\": {}\n}"
+            }
+          },
+          "response": []
         },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"tools-call-1\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"sample-tool\",\n    \"arguments\": {\n      \"input\": \"Hello from Postman!\"\n    }\n  }\n}"
+        {
+          "name": "Unknown Tool",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mcp",
+              "host": ["{{base_url}}"],
+              "path": ["mcp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"err-2\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"nonexistent-tool\",\n    \"arguments\": {}\n  }\n}"
+            }
+          },
+          "response": []
         }
-      },
-      "response": []
+      ]
     }
   ]
 }

@@ -47,3 +47,42 @@ methods:
     annotations:
       categories:
         - analysis
+  - name: chart-editor
+    title: Chart Editor
+    description: Interactive chart editor with embedded UI for configuring data visualization.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        chartType:
+          type: string
+          enum: [bar, line, pie, scatter]
+          description: Type of chart to create.
+          default: bar
+        title:
+          type: string
+          description: Title for the chart.
+        data:
+          type: array
+          items:
+            type: number
+          description: Data values for the chart.
+        labels:
+          type: array
+          items:
+            type: string
+          description: Labels for each data point.
+    outputSchema:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+    annotations:
+      categories:
+        - visualization
+        - interactive
+      ui:
+        outputUri: mcp://resource/chart-editor.html
+        displayHint: embedded

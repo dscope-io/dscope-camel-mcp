@@ -18,6 +18,12 @@ import io.dscope.camel.mcp.processor.McpResourcesListProcessor;
 import io.dscope.camel.mcp.processor.McpResourcesReadProcessor;
 import io.dscope.camel.mcp.processor.McpStreamProcessor;
 import io.dscope.camel.mcp.processor.McpToolsListProcessor;
+import io.dscope.camel.mcp.processor.McpUiInitializeProcessor;
+import io.dscope.camel.mcp.processor.McpUiMessageProcessor;
+import io.dscope.camel.mcp.processor.McpUiToolsCallPostProcessor;
+import io.dscope.camel.mcp.processor.McpUiToolsCallProcessor;
+import io.dscope.camel.mcp.processor.McpUiUpdateModelContextProcessor;
+import io.dscope.camel.mcp.service.McpUiSessionRegistry;
 
 /**
  * Simplifies bootstrapping a Camel {@link Main} instance with the default MCP processors.
@@ -40,6 +46,14 @@ public abstract class McpComponentApplicationSupport {
     private final McpErrorProcessor error = new McpErrorProcessor();
     private final McpStreamProcessor stream = new McpStreamProcessor();
     private final McpHealthStatusProcessor healthStatus = new McpHealthStatusProcessor(rateLimit);
+    
+    // MCP Apps Bridge processors
+    private final McpUiSessionRegistry uiSessionRegistry = new McpUiSessionRegistry();
+    private final McpUiInitializeProcessor uiInitialize = new McpUiInitializeProcessor(uiSessionRegistry);
+    private final McpUiMessageProcessor uiMessage = new McpUiMessageProcessor(uiSessionRegistry);
+    private final McpUiUpdateModelContextProcessor uiUpdateModelContext = new McpUiUpdateModelContextProcessor(uiSessionRegistry);
+    private final McpUiToolsCallProcessor uiToolsCall = new McpUiToolsCallProcessor(uiSessionRegistry);
+    private final McpUiToolsCallPostProcessor uiToolsCallPost = new McpUiToolsCallPostProcessor(uiSessionRegistry);
 
     public final void run(String[] args) throws Exception {
         Main main = createMain();
@@ -75,6 +89,10 @@ public abstract class McpComponentApplicationSupport {
         return stream;
     }
 
+    protected McpUiSessionRegistry getUiSessionRegistry() {
+        return uiSessionRegistry;
+    }
+
     private void bindDefaultBeans(Main main) {
         main.bind("mcpRequestSizeGuard", requestSizeGuard);
         if (includeHttpValidator()) {
@@ -93,6 +111,14 @@ public abstract class McpComponentApplicationSupport {
         main.bind("mcpError", error);
         main.bind("mcpStream", stream);
         main.bind("mcpHealthStatus", healthStatus);
+        
+        // MCP Apps Bridge processors
+        main.bind("mcpUiSessionRegistry", uiSessionRegistry);
+        main.bind("mcpUiInitialize", uiInitialize);
+        main.bind("mcpUiMessage", uiMessage);
+        main.bind("mcpUiUpdateModelContext", uiUpdateModelContext);
+        main.bind("mcpUiToolsCall", uiToolsCall);
+        main.bind("mcpUiToolsCallPost", uiToolsCallPost);
     }
 
     private void configureRoutes(Main main) {

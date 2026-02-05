@@ -89,6 +89,43 @@
                                 simple: "Tool execution failed: ${exception.message}"
                             - process:
                                 ref: mcpError
+              # MCP Apps Bridge methods
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ui/initialize'"
+                steps:
+                  - process:
+                      ref: mcpUiInitialize
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ui/message'"
+                steps:
+                  - process:
+                      ref: mcpUiMessage
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ui/update-model-context'"
+                steps:
+                  - process:
+                      ref: mcpUiUpdateModelContext
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ui/tools/call'"
+                steps:
+                  - doTry:
+                      steps:
+                        - process:
+                            ref: mcpUiToolsCall
+                        - process:
+                            ref: sampleToolCallProcessor
+                        - process:
+                            ref: mcpUiToolsCallPost
+                      doCatch:
+                        - exception:
+                            - java.lang.Exception
+                          steps:
+                            - process:
+                                ref: mcpUiToolsCallPost
+                            - setProperty:
+                                name: mcp.error.code
+                                constant: "-32603"
+                            - setProperty:
+                                name: mcp.error.message
+                                simple: "Tool execution failed: ${exception.message}"
+                            - process:
+                                ref: mcpError
             otherwise:
               steps:
                 - setProperty:

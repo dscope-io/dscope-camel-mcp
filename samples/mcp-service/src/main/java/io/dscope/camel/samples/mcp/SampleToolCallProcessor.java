@@ -36,6 +36,7 @@ public class SampleToolCallProcessor extends AbstractMcpResponseProcessor {
         switch (toolName) {
             case "echo" -> writeResult(exchange, handleEcho(params));
             case "summarize", "summary" -> writeResult(exchange, handleSummarize(params));
+            case "chart-editor" -> writeResult(exchange, handleChartEditor(params));
             default -> throw new IllegalArgumentException("Unknown tool: " + toolName);
         }
     }
@@ -75,5 +76,50 @@ public class SampleToolCallProcessor extends AbstractMcpResponseProcessor {
         }
         builder.append(" …");
         return builder.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> handleChartEditor(Map<String, Object> arguments) {
+        // Extract chart configuration
+        String chartType = Objects.toString(arguments == null ? null : arguments.get("chartType"), "bar");
+        String title = Objects.toString(arguments == null ? null : arguments.get("title"), "Untitled Chart");
+        
+        List<Number> data;
+        Object dataObj = arguments == null ? null : arguments.get("data");
+        if (dataObj instanceof List) {
+            data = (List<Number>) dataObj;
+        } else {
+            data = List.of(10, 20, 30, 40, 50); // default sample data
+        }
+        
+        List<String> labels;
+        Object labelsObj = arguments == null ? null : arguments.get("labels");
+        if (labelsObj instanceof List) {
+            labels = (List<String>) labelsObj;
+        } else {
+            labels = List.of("A", "B", "C", "D", "E"); // default labels
+        }
+        
+        // Build response with embedded resource reference for MCP Apps
+        Map<String, Object> chartConfig = Map.of(
+                "chartType", chartType,
+                "title", title,
+                "data", data,
+                "labels", labels);
+        
+        Map<String, Object> content = Map.of(
+                "type", "resource",
+                "resource", Map.of(
+                        "uri", "mcp://resource/chart-editor.html",
+                        "mimeType", "text/html",
+                        "metadata", Map.of(
+                                "displayHint", "embedded",
+                                "initialData", chartConfig)));
+        
+        return Map.of(
+                "content", List.of(content),
+                "_meta", Map.of("ui", Map.of(
+                        "outputUri", "mcp://resource/chart-editor.html",
+                        "displayHint", "embedded")));
     }
 }

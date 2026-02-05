@@ -55,7 +55,7 @@ Response:
     "protocolVersion": "2024-11-05",
     "serverInfo": {
       "name": "camel-mcp-server",
-      "version": "1.1.0"
+      "version": "1.2.0"
     },
     "capabilities": {
       "tools": { "listChanged": true },
@@ -205,6 +205,76 @@ Resources are loaded from `samples/mcp-service/src/main/resources/data/`. The re
 - **Text**: `{"uri": "...", "mimeType": "text/html", "text": "content..."}`
 - **JSON**: Direct structured data
 
+## MCP Apps Bridge (UI Methods)
+
+The component supports embedded UI integration via the MCP Apps Bridge specification.
+
+### `ui/initialize` - Start a UI session
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-1",
+    "method": "ui/initialize",
+    "params": {
+      "clientInfo": {"name": "my-ui", "version": "1.0.0"},
+      "resourceUri": "mcp://resource/chart-editor.html",
+      "toolName": "chart-editor"
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "ui-1",
+  "result": {
+    "sessionId": "abc123-uuid-...",
+    "hostInfo": {"name": "camel-mcp", "version": "1.2.0"},
+    "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
+  }
+}
+```
+
+### `ui/tools/call` - Call a tool from UI context
+
+Use the `sessionId` from `ui/initialize`:
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-2",
+    "method": "ui/tools/call",
+    "params": {
+      "sessionId": "abc123-uuid-...",
+      "name": "echo",
+      "arguments": {"text": "Hello from UI!"}
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+### `ui/message` - Send UI events
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-3",
+    "method": "ui/message",
+    "params": {
+      "sessionId": "abc123-uuid-...",
+      "type": "user-action",
+      "payload": {"action": "chart-type-changed", "value": "line"}
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
 ## WebSocket Transport
 
 WebSocket provides persistent, bidirectional connections ideal for agent sessions.
@@ -226,7 +296,7 @@ Once connected, send JSON-RPC messages (lines starting with `>` are sent, `<` ar
 ```
 # Initialize session (required first)
 > {"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"ws-client","version":"1.0.0"}}}
-< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.1.0"}}}
+< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.2.0"}}}
 
 # Ping (health check)
 > {"jsonrpc":"2.0","id":"2","method":"ping"}

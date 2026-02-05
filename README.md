@@ -6,8 +6,8 @@
 
 | Channel | Version | Maven Coordinate | Notes |
 | --- | --- | --- | --- |
-| Latest Release | 1.1.0 | `io.dscope.camel:camel-mcp:1.1.0` | Recommended for production use |
-| Development Snapshot | 1.1.0 | `io.dscope.camel:camel-mcp:1.1.0` | Build from source (`mvn install`) to track `main` |
+| Latest Release | 1.2.0 | `io.dscope.camel:camel-mcp:1.2.0` | Recommended for production use |
+| Development Snapshot | 1.2.0 | `io.dscope.camel:camel-mcp:1.2.0` | Build from source (`mvn install`) to track `main` |
 
 ## 📋 Requirements
 
@@ -18,6 +18,7 @@
 ## 🚀 Features
 
 - Implements core MCP JSON-RPC methods: `initialize`, `ping`, `resources/list`, `resources/get`, `tools/list`, and `tools/call`.
+- **MCP Apps Bridge support**: `ui/initialize`, `ui/message`, `ui/update-model-context`, and `ui/tools/call` for embedded UI integration.
 - Sends MCP traffic over standard Camel HTTP clients and exposes WebSocket helpers for streaming scenarios.
 - Ships registry processors for JSON-RPC envelopes, tool catalogs, and notification workflows.
 - Sample service and Postman collections to exercise MCP flows end-to-end.
@@ -32,7 +33,7 @@
 <dependency>
   <groupId>io.dscope.camel</groupId>
   <artifactId>camel-mcp</artifactId>
-  <version>1.1.0</version>
+  <version>1.2.0</version>
 </dependency>
 ```
 
@@ -250,6 +251,89 @@ curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
 # Binary resource (returns base64)
 curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
   -d '{"jsonrpc": "2.0", "id": "6", "method": "resources/get", "params": {"resource": "sample-image.jpg"}}' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+### MCP Apps Bridge (UI Methods)
+
+The component supports the [MCP Apps Bridge](https://modelcontextprotocol.io/specification/2025-06-18/client/apps-bridge) specification for embedding interactive UIs within AI agent workflows.
+
+#### `ui/initialize` - Start a UI session
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-1",
+    "method": "ui/initialize",
+    "params": {
+      "clientInfo": {"name": "my-ui", "version": "1.0.0"},
+      "resourceUri": "mcp://resource/chart-editor.html",
+      "toolName": "chart-editor"
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+Response includes a `sessionId` for subsequent UI calls:
+```json
+{
+  "result": {
+    "sessionId": "abc123-...",
+    "hostInfo": {"name": "camel-mcp", "version": "1.2.0"},
+    "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
+  }
+}
+```
+
+#### `ui/tools/call` - Execute a tool from UI context
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-2",
+    "method": "ui/tools/call",
+    "params": {
+      "sessionId": "<sessionId-from-ui-initialize>",
+      "name": "echo",
+      "arguments": {"text": "Hello from UI!"}
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `ui/message` - Send messages from embedded UI
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-3",
+    "method": "ui/message",
+    "params": {
+      "sessionId": "<sessionId>",
+      "type": "user-action",
+      "payload": {"action": "button-clicked"}
+    }
+  }' \
+  http://localhost:8080/mcp | jq '.'
+```
+
+#### `ui/update-model-context` - Update AI model context
+
+```bash
+curl -s -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "ui-4",
+    "method": "ui/update-model-context",
+    "params": {
+      "sessionId": "<sessionId>",
+      "context": {"chartConfig": {"type": "bar", "data": [1,2,3]}},
+      "mode": "merge"
+    }
+  }' \
   http://localhost:8080/mcp | jq '.'
 ```
 

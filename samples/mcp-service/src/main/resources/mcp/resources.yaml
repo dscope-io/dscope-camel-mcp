@@ -23,3 +23,12 @@ resources:
     name: sample-image.jpg
     description: Sample JPEG image demonstrating binary resource support.
     mimeType: image/jpeg
+
+  - uri: "resource://data/chart-editor.html"
+    name: chart-editor.html
+    description: Interactive chart editor UI for MCP Apps Bridge demonstration.
+    mimeType: text/html
+    annotations:
+      ui:
+        displayHint: embedded
+        category: visualization

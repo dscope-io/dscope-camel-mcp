@@ -57,6 +57,58 @@ Fetches a resource by name or URI.
 
 Returns resource content (format depends on type - see below).
 
+## MCP Apps Bridge Methods
+
+The component implements the [MCP Apps Bridge](https://modelcontextprotocol.io/specification/2025-06-18/client/apps-bridge) specification for embedding interactive UIs within AI agent workflows.
+
+### `ui/initialize`
+
+Establishes a UI session for embedded interface communication.
+
+| Field | Description |
+|-------|-------------|
+| `params.clientInfo` | UI client name and version |
+| `params.resourceUri` | URI of the resource to display |
+| `params.toolName` | Associated tool name (optional) |
+
+Returns `sessionId`, `hostInfo`, and `capabilities`.
+
+### `ui/message`
+
+Sends a message from the embedded UI to the host.
+
+| Field | Description |
+|-------|-------------|
+| `params.sessionId` | Session ID from `ui/initialize` |
+| `params.type` | Message type (e.g., `user-action`) |
+| `params.payload` | Message-specific data |
+
+Returns `{ "acknowledged": true }`.
+
+### `ui/update-model-context`
+
+Updates the AI model's context with UI state.
+
+| Field | Description |
+|-------|-------------|
+| `params.sessionId` | Session ID from `ui/initialize` |
+| `params.context` | Context data to update |
+| `params.mode` | Update mode: `merge` or `replace` |
+
+Returns `{ "acknowledged": true, "mode": "merge" }`.
+
+### `ui/tools/call`
+
+Executes a tool within a UI session context.
+
+| Field | Description |
+|-------|-------------|
+| `params.sessionId` | Session ID from `ui/initialize` |
+| `params.name` | Tool name to invoke |
+| `params.arguments` | Tool-specific arguments |
+
+Returns tool execution result. The session is validated before execution.
+
 ## Method Processors
 
 - **`initialize`** and **`ping`** respond with canned results for connectivity checks.
@@ -74,6 +126,14 @@ Returns resource content (format depends on type - see below).
   - **JSON**: files without extension (appends `.json`) → structured data
 
 - **`tools/list`** and **`tools/call`** serve tool definitions and executions. Tool metadata loads from `classpath:mcp/methods.yaml`.
+
+- **UI methods** (`ui/initialize`, `ui/message`, `ui/update-model-context`, `ui/tools/call`) are handled by dedicated processors:
+  - `McpUiInitializeProcessor` - Creates UI sessions with unique IDs, stores in `McpUiSessionRegistry`
+  - `McpUiMessageProcessor` - Validates session and acknowledges messages
+  - `McpUiUpdateModelContextProcessor` - Updates model context with merge/replace modes
+  - `McpUiToolsCallProcessor` - Validates session before delegating to tool processor
+  
+  Sessions are managed by `McpUiSessionRegistry` with configurable TTL (default: 30 minutes).
 
 ## Transport Layer
 

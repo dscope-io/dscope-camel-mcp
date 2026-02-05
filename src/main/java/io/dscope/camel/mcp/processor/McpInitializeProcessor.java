@@ -55,7 +55,13 @@ public class McpInitializeProcessor extends AbstractMcpResponseProcessor {
         Map<String, Object> capabilities = new LinkedHashMap<>();
         capabilities.put("tools/list", Boolean.TRUE);
         capabilities.put("tools/call", Boolean.TRUE);
-    capabilities.put("ping", Boolean.TRUE);
+        capabilities.put("ping", Boolean.TRUE);
+        // MCP Apps Bridge capabilities
+        capabilities.put("ui/initialize", Boolean.TRUE);
+        capabilities.put("ui/message", Boolean.TRUE);
+        capabilities.put("ui/update-model-context", Boolean.TRUE);
+        capabilities.put("ui/notifications/tool-input", Boolean.TRUE);
+        capabilities.put("ui/notifications/tool-result", Boolean.TRUE);
         if (params.containsKey("logging")) {
             capabilities.put("logging", Map.of());
         }

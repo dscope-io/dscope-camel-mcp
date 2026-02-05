@@ -97,9 +97,16 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
             case "tools/call" -> handleToolsCall(exchange, params);
             case "health" -> handleHealth(exchange, params);
             case "stream" -> handleStream(exchange, params);
+            // MCP Apps Bridge methods
+            case "ui/initialize" -> handleUiInitialize(exchange, params);
+            case "ui/message" -> handleUiMessage(exchange, params);
+            case "ui/update-model-context" -> handleUiUpdateModelContext(exchange, params);
+            case "ui/tools/call" -> handleUiToolsCall(exchange, params);
             default -> {
                 if (method.startsWith("notifications/")) {
                     handleNotification(exchange, method, params);
+                } else if (method.startsWith("ui/notifications/")) {
+                    handleUiNotification(exchange, method, params);
                 } else {
                     throw new IllegalArgumentException("Unsupported MCP method: " + method);
                 }
@@ -157,6 +164,47 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
         String type = method.substring("notifications/".length()).trim();
         if (type.isEmpty()) {
             throw new IllegalArgumentException("Notification method must include a type segment");
+        }
+        Map<String, Object> notificationParams = params == null ? Map.of() : params;
+        exchange.getIn().setBody(notificationParams);
+    }
+
+    // MCP Apps Bridge handlers
+
+    private void handleUiInitialize(Exchange exchange, Map<String, Object> params) {
+        exchange.getIn().setBody(params == null ? Map.of() : params);
+    }
+
+    private void handleUiMessage(Exchange exchange, Map<String, Object> params) {
+        exchange.getIn().setBody(params == null ? Map.of() : params);
+    }
+
+    private void handleUiUpdateModelContext(Exchange exchange, Map<String, Object> params) {
+        exchange.getIn().setBody(params == null ? Map.of() : params);
+    }
+
+    private void handleUiToolsCall(Exchange exchange, Map<String, Object> params) {
+        if (params == null) {
+            throw new IllegalArgumentException("params must be provided for ui/tools/call");
+        }
+
+        // Extract sessionId and set as exchange property (required for session validation)
+        asTrimmedString(params.get("sessionId"))
+                .ifPresent(sessionId -> exchange.setProperty(McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID, sessionId));
+
+        String toolName = asTrimmedString(params.get("name"))
+                .orElseThrow(() -> new IllegalArgumentException("params.name is required for ui/tools/call"));
+        exchange.setProperty(EXCHANGE_PROPERTY_TOOL_NAME, toolName);
+
+        Map<String, Object> arguments = Optional.ofNullable(asMap(params.get("arguments"), "params.arguments"))
+                .orElseGet(LinkedHashMap::new);
+        exchange.getIn().setBody(arguments);
+    }
+
+    private void handleUiNotification(Exchange exchange, String method, Map<String, Object> params) {
+        String type = method.substring("ui/notifications/".length()).trim();
+        if (type.isEmpty()) {
+            throw new IllegalArgumentException("UI notification method must include a type segment");
         }
         Map<String, Object> notificationParams = params == null ? Map.of() : params;
         exchange.getIn().setBody(notificationParams);
