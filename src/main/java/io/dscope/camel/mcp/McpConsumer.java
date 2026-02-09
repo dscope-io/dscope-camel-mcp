@@ -80,8 +80,19 @@ public class McpConsumer extends DefaultConsumer {
                 // Serialize response to JSON if it's a Map or POJO
                 Object body = exchange.getMessage().getBody();
                 if (body != null && !(body instanceof String) && !(body instanceof byte[])) {
-                    String json = objectMapper.writeValueAsString(body);
-                    exchange.getMessage().setBody(json);
+                    try {
+                        String json = objectMapper.writeValueAsString(body);
+                        exchange.getMessage().setBody(json);
+                    } catch (Exception e) {
+                        String bodyType = body.getClass().getName();
+                        String bodyPreview = body.toString();
+                        if (bodyPreview.length() > 100) {
+                            bodyPreview = bodyPreview.substring(0, 100) + "...";
+                        }
+                        throw new IllegalStateException(
+                            String.format("Failed to serialize response body to JSON. Type: %s, Preview: %s", 
+                                bodyType, bodyPreview), e);
+                    }
                 }
                 
                 // Ensure response has JSON content type
@@ -140,17 +151,24 @@ public class McpConsumer extends DefaultConsumer {
             // Convert http:// to ws:// for WebSocket
             String wsUri = baseUri.replace("http://", "ws://").replace("https://", "wss://");
             uri.append(wsUri);
-            uri.append(wsUri.contains("?") ? "&" : "?");
-            uri.append("sendToAll=").append(config.isSendToAll());
-            uri.append("&allowedOrigins=").append(config.getAllowedOrigins());
-            uri.append("&exchangePattern=InOut");
+            appendQueryParam(uri, "sendToAll", String.valueOf(config.isSendToAll()));
+            appendQueryParam(uri, "allowedOrigins", config.getAllowedOrigins());
+            appendQueryParam(uri, "exchangePattern", "InOut");
         } else {
             // HTTP endpoint
             uri.append(baseUri);
-            uri.append(baseUri.contains("?") ? "&" : "?");
-            uri.append("httpMethodRestrict=").append(config.getHttpMethodRestrict());
+            appendQueryParam(uri, "httpMethodRestrict", config.getHttpMethodRestrict());
         }
         
         return uri.toString();
+    }
+    
+    /**
+     * Helper method to append query parameters to URI.
+     */
+    private void appendQueryParam(StringBuilder uri, String param, String value) {
+        String currentUri = uri.toString();
+        uri.append(currentUri.contains("?") ? "&" : "?");
+        uri.append(param).append("=").append(value);
     }
 }

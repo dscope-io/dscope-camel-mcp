@@ -80,7 +80,6 @@ class McpConsumerTest {
         );
 
         assertNotNull(response);
-        System.out.println("Actual response: " + response);
         assertTrue(response.contains("\"jsonrpc\":\"2.0\"") || response.contains("\"jsonrpc\": \"2.0\""),
             "Response should contain JSON-RPC 2.0 but was: " + response);
     }
