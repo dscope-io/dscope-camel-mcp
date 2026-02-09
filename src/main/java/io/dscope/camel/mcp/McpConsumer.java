@@ -63,29 +63,34 @@ public class McpConsumer extends DefaultConsumer {
         
         // Create a processor chain that includes MCP processing before calling user processor
         Processor mcpProcessor = exchange -> {
-            // Apply MCP processors in sequence
-            requestSizeGuard.process(exchange);
-            
-            if (!config.isWebsocket()) {
-                httpValidator.process(exchange);
-            }
-            
-            rateLimit.process(exchange);
-            jsonRpcEnvelope.process(exchange);
-            
-            // Call the user's processor
-            getProcessor().process(exchange);
-            
-            // Serialize response to JSON if it's a Map or POJO
-            Object body = exchange.getMessage().getBody();
-            if (body != null && !(body instanceof String) && !(body instanceof byte[])) {
-                String json = objectMapper.writeValueAsString(body);
-                exchange.getMessage().setBody(json);
-            }
-            
-            // Ensure response has JSON content type
-            if (exchange.getMessage().getHeader("Content-Type") == null) {
-                exchange.getMessage().setHeader("Content-Type", "application/json");
+            try {
+                // Apply MCP processors in sequence
+                requestSizeGuard.process(exchange);
+                
+                if (!config.isWebsocket()) {
+                    httpValidator.process(exchange);
+                }
+                
+                rateLimit.process(exchange);
+                jsonRpcEnvelope.process(exchange);
+                
+                // Call the user's processor
+                getProcessor().process(exchange);
+                
+                // Serialize response to JSON if it's a Map or POJO
+                Object body = exchange.getMessage().getBody();
+                if (body != null && !(body instanceof String) && !(body instanceof byte[])) {
+                    String json = objectMapper.writeValueAsString(body);
+                    exchange.getMessage().setBody(json);
+                }
+                
+                // Ensure response has JSON content type
+                if (exchange.getMessage().getHeader("Content-Type") == null) {
+                    exchange.getMessage().setHeader("Content-Type", "application/json");
+                }
+            } catch (Exception e) {
+                LOG.error("Error processing MCP request", e);
+                throw e;
             }
         };
         
