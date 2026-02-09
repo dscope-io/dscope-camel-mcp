@@ -23,6 +23,6 @@
             json:
               library: Jackson
         - to:
-            uri: "mcp:http://localhost:8080/mcp?method=initialize"
+            uri: "mcp:http://localhost:18080/mcp?method=initialize"
         - log:
             message: "MCP Response: ${body}"

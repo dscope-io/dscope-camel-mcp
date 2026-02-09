@@ -40,7 +40,7 @@ Add **MCP Apps UI Bridge** support to `io.dscope:camel-mcp` to enable the librar
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           MCP Apps Host Bridge                               │
-│                         (New in camel-mcp 1.2.0)                             │
+│                         (New in camel-mcp 1.3.0)                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────────┐    postMessage    ┌──────────────────────────────────┐│
@@ -140,7 +140,7 @@ public class McpUiInitializeResult {
     
     public static class McpHostInfo {
         private String name;    // "camel-mcp"
-        private String version; // "1.2.0"
+        private String version; // "1.3.0"
     }
 }
 ```
@@ -265,7 +265,7 @@ public class McpUiInitializeProcessor extends AbstractMcpResponseProcessor {
         // Build response
         McpUiInitializeResult result = new McpUiInitializeResult();
         result.setSessionId(session.getSessionId());
-        result.setHostInfo(new McpHostInfo("camel-mcp", "1.2.0"));
+        result.setHostInfo(new McpHostInfo("camel-mcp", "1.3.0"));
         result.setCapabilities(List.of(
             "tools/call",
             "ui/message",

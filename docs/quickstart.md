@@ -14,11 +14,48 @@ mvn exec:java -Dexec.mainClass=io.dscope.camel.mcp.CamelMcpRunner
 
 ## Start the sample MCP service (HTTP + WebSocket)
 
+### Option 1: Kamelet-based service (mcp-service)
+
+Full-featured MCP server using Kamelets and YAML routes:
+
 ```bash
 mvn -f samples/mcp-service/pom.xml exec:java
 ```
 
+Endpoints: `http://localhost:8080/mcp` (HTTP), `ws://localhost:8090/mcp` (WebSocket).
+
 To run only the WebSocket routes, add `-Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml` to the command. Running `mvn package` in the same module generates `samples/mcp-service/target/openapi/mcp-service.yaml`, and tool metadata comes from `samples/mcp-service/src/main/resources/mcp/methods.yaml`.
+
+### Option 2: Direct consumer (mcp-consumer)
+
+Minimal MCP server using the `from("mcp:...")` consumer component — pure Java, no YAML needed:
+
+```bash
+mvn -f samples/mcp-consumer/pom.xml exec:java
+```
+
+Endpoints: `http://localhost:3000/mcp` (HTTP), `ws://localhost:3001/mcp` (WebSocket).
+
+Tools provided: `echo`, `add`, `greet`. See [samples/mcp-consumer/README.md](../samples/mcp-consumer/README.md) for architecture and details.
+
+Test the consumer sample:
+
+```bash
+# Initialize
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"1.0.0"},"capabilities":{}}}' \
+  http://localhost:3000/mcp | jq '.'
+
+# List tools
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"2","method":"tools/list"}' \
+  http://localhost:3000/mcp | jq '.'
+
+# Call the add tool
+curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"3","method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}' \
+  http://localhost:3000/mcp | jq '.'
+```
 
 ## Calling MCP Methods
 
@@ -55,7 +92,7 @@ Response:
     "protocolVersion": "2024-11-05",
     "serverInfo": {
       "name": "camel-mcp-server",
-      "version": "1.2.0"
+      "version": "1.3.0"
     },
     "capabilities": {
       "tools": { "listChanged": true },
@@ -233,7 +270,7 @@ Response:
   "id": "ui-1",
   "result": {
     "sessionId": "abc123-uuid-...",
-    "hostInfo": {"name": "camel-mcp", "version": "1.2.0"},
+    "hostInfo": {"name": "camel-mcp", "version": "1.3.0"},
     "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
   }
 }
@@ -296,7 +333,7 @@ Once connected, send JSON-RPC messages (lines starting with `>` are sent, `<` ar
 ```
 # Initialize session (required first)
 > {"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"ws-client","version":"1.0.0"}}}
-< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.2.0"}}}
+< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.3.0"}}}
 
 # Ping (health check)
 > {"jsonrpc":"2.0","id":"2","method":"ping"}

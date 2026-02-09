@@ -1,0 +1,28 @@
+{
+  "kind" : "kamelet",
+  "name" : "mcp-rest-service",
+  "title" : "MCP REST Service",
+  "description" : "Exposes an MCP-compliant JSON-RPC server over HTTP using Undertow.",
+  "properties" : {
+    "port" : {
+      "title" : "Port",
+      "type" : "integer",
+      "default" : "8080",
+      "description" : "HTTP listen port"
+    },
+    "host" : {
+      "title" : "Host",
+      "type" : "string",
+      "default" : "0.0.0.0",
+      "description" : "Listen address"
+    },
+    "path" : {
+      "title" : "Path",
+      "type" : "string",
+      "default" : "/mcp",
+      "description" : "Context path for the MCP endpoint"
+    }
+  },
+  "labels" : [ "ai", "mcp" ],
+  "supportedMethods" : [ "initialize", "ping", "tools/list", "tools/call", "resources/list", "resources/read", "resources/get", "health", "stream", "ui/initialize", "ui/message", "ui/update-model-context", "ui/tools/call" ]
+}

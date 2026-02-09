@@ -14,7 +14,7 @@ public class McpAppsConfiguration {
     private boolean enabled = DEFAULT_ENABLED;
     private long sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS;
     private String hostName = "camel-mcp";
-    private String hostVersion = "1.2.0";
+    private String hostVersion = "1.3.0";
 
     public McpAppsConfiguration() {
     }
@@ -26,7 +26,7 @@ public class McpAppsConfiguration {
      * - mcp.apps.enabled (boolean, default: true)
      * - mcp.apps.session.timeout (long milliseconds, default: 3600000)
      * - mcp.apps.host.name (string, default: camel-mcp)
-     * - mcp.apps.host.version (string, default: 1.2.0)
+     * - mcp.apps.host.version (string, default: 1.3.0)
      * 
      * @return configuration instance
      */

@@ -1,0 +1,81 @@
+{
+  "component" : {
+    "kind" : "component",
+    "name" : "mcp",
+    "title" : "MCP",
+    "description" : "Model Context Protocol (MCP) component for AI agent integration. Supports JSON-RPC 2.0 over HTTP and WebSocket. Producer sends requests to an MCP server; Consumer exposes an MCP server endpoint.",
+    "scheme" : "mcp",
+    "syntax" : "mcp:uri",
+    "alternativeSyntax" : "mcp:uri?method=initialize",
+    "firstVersion" : "1.0.0",
+    "groupId" : "io.dscope.camel",
+    "artifactId" : "camel-mcp",
+    "version" : "1.3.0",
+    "producerOnly" : false,
+    "consumerOnly" : false,
+    "lenientProperties" : true,
+    "label" : [ "ai", "mcp", "rpc" ]
+  },
+  "properties" : {
+    "uri" : {
+      "kind" : "path",
+      "displayName" : "Uri",
+      "group" : "common",
+      "label" : "common",
+      "required" : true,
+      "type" : "string",
+      "description" : "The target MCP server URI (e.g. http://localhost:8080/mcp)."
+    },
+    "method" : {
+      "kind" : "parameter",
+      "displayName" : "Method",
+      "group" : "producer",
+      "label" : "producer",
+      "required" : false,
+      "type" : "string",
+      "defaultValue" : "tools/list",
+      "description" : "The MCP JSON-RPC method to invoke.",
+      "enum" : [ "initialize", "ping", "tools/list", "tools/call", "resources/list", "resources/read", "resources/get", "health", "stream", "ui/initialize", "ui/message", "ui/update-model-context", "ui/tools/call" ]
+    },
+    "websocket" : {
+      "kind" : "parameter",
+      "displayName" : "Websocket",
+      "group" : "consumer",
+      "label" : "consumer",
+      "required" : false,
+      "type" : "boolean",
+      "defaultValue" : "false",
+      "description" : "When true the consumer creates a WebSocket endpoint instead of HTTP."
+    },
+    "sendToAll" : {
+      "kind" : "parameter",
+      "displayName" : "Send To All",
+      "group" : "consumer",
+      "label" : "consumer",
+      "required" : false,
+      "type" : "boolean",
+      "defaultValue" : "false",
+      "description" : "For WebSocket consumers, broadcast messages to all connected clients."
+    },
+    "allowedOrigins" : {
+      "kind" : "parameter",
+      "displayName" : "Allowed Origins",
+      "group" : "consumer",
+      "label" : "consumer",
+      "required" : false,
+      "type" : "string",
+      "defaultValue" : "*",
+      "description" : "Comma-separated list of allowed CORS origins."
+    },
+    "httpMethodRestrict" : {
+      "kind" : "parameter",
+      "displayName" : "Http Method Restrict",
+      "group" : "consumer",
+      "label" : "consumer",
+      "required" : false,
+      "type" : "string",
+      "defaultValue" : "POST",
+      "description" : "HTTP methods allowed by the consumer endpoint."
+    }
+  }
+}

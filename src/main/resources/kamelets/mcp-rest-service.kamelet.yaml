@@ -57,6 +57,10 @@ spec:
         type: io.dscope.camel.mcp.processor.McpToolsListProcessor
       - name: mcpResourcesGet
         type: io.dscope.camel.mcp.processor.McpResourcesGetProcessor
+      - name: mcpResourcesList
+        type: io.dscope.camel.mcp.processor.McpResourcesListProcessor
+      - name: mcpResourcesRead
+        type: io.dscope.camel.mcp.processor.McpResourcesReadProcessor
       - name: mcpStream
         type: io.dscope.camel.mcp.processor.McpStreamProcessor
       - name: mcpHealthStatus
@@ -67,6 +71,24 @@ spec:
         type: io.dscope.camel.mcp.processor.McpNotificationsInitializedProcessor
       - name: mcpNotificationAck
         type: io.dscope.camel.mcp.processor.McpNotificationAckProcessor
+      - name: mcpError
+        type: io.dscope.camel.mcp.processor.McpErrorProcessor
+      - name: mcpRateLimit
+        type: io.dscope.camel.mcp.processor.McpRateLimitProcessor
+      - name: mcpRequestSizeGuard
+        type: io.dscope.camel.mcp.processor.McpRequestSizeGuardProcessor
+      - name: mcpUiSessionRegistry
+        type: io.dscope.camel.mcp.service.McpUiSessionRegistry
+      - name: mcpUiInitialize
+        type: io.dscope.camel.mcp.processor.McpUiInitializeProcessor
+      - name: mcpUiMessage
+        type: io.dscope.camel.mcp.processor.McpUiMessageProcessor
+      - name: mcpUiUpdateModelContext
+        type: io.dscope.camel.mcp.processor.McpUiUpdateModelContextProcessor
+      - name: mcpUiToolsCall
+        type: io.dscope.camel.mcp.processor.McpUiToolsCallProcessor
+      - name: mcpUiToolsCallPost
+        type: io.dscope.camel.mcp.processor.McpUiToolsCallPostProcessor
     from:
       uri: "{{restComponent}}:http://{{restHost}}:{{restPort}}{{restContextPath}}?matchOnUriPrefix=true"
       steps:
@@ -100,66 +122,145 @@ spec:
               # JSON-RPC POST dispatcher: POST /mcp (accept both /mcp and /mcp/)
               - simple: "${header.CamelHttpMethod} == 'POST'"
                 steps:
-                  - to: "bean:mcpJsonRpcEnvelope"
-                  - log:
-                      loggingLevel: DEBUG
-                      message: "MCP JSON-RPC payload: ${body}"
-                  - log:
-                      loggingLevel: INFO
-                      message: "MCP JSON-RPC request received: ${exchangeProperty[mcp.jsonrpc.method]}"
-                  - choice:
-                      when:
-                        # Notifications branch
-                        - simple: "${exchangeProperty[mcp.jsonrpc.type]} == 'NOTIFICATION'"
+                  - doTry:
+                      steps:
+                        - to: "bean:mcpJsonRpcEnvelope"
+                        - log:
+                            loggingLevel: DEBUG
+                            message: "MCP JSON-RPC payload: ${body}"
+                        - log:
+                            loggingLevel: INFO
+                            message: "MCP JSON-RPC request received: ${exchangeProperty[mcp.jsonrpc.method]}"
+                        - choice:
+                            when:
+                              # Notifications branch
+                              - simple: "${exchangeProperty[mcp.jsonrpc.type]} == 'NOTIFICATION'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Notification received"
+                                  - to: "bean:mcpNotification"
+                                  - choice:
+                                      when:
+                                        - simple: "${exchangeProperty[mcp.notification.type]} == 'initialized'"
+                                          steps:
+                                            - to: "bean:mcpNotificationsInitialized"
+                                      otherwise:
+                                        steps:
+                                          - to: "bean:mcpNotificationAck"
+                              # Request methods branch
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'initialize'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Initialize request received"
+                                  - to: mcpInitialize
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ping'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Ping request received"
+                                  - to: mcpPing
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/list'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Tools List request received"
+                                  - to: mcpToolsList
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/call'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Tools Call request for bean {{toolsCallBean}} received"
+                                  - to: "bean:{{toolsCallBean}}"
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'resources/list'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Resources List request received"
+                                  - to: mcpResourcesList
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'resources/read'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Resources Read request received"
+                                  - to: mcpResourcesRead
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'resources/get'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP Resources Get request received"
+                                  - to: "bean:{{resourcesGetBean}}"
+                              # MCP Apps Bridge (ui/*) methods
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ui/initialize'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP UI Initialize request received"
+                                  - to: "bean:mcpUiInitialize"
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ui/message'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP UI Message request received"
+                                  - to: "bean:mcpUiMessage"
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ui/update-model-context'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP UI Update Model Context request received"
+                                  - to: "bean:mcpUiUpdateModelContext"
+                              - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ui/tools/call'"
+                                steps:
+                                  - log:
+                                      loggingLevel: INFO
+                                      message: "MCP UI Tools Call request received"
+                                  - doTry:
+                                      steps:
+                                        - to: "bean:mcpUiToolsCall"
+                                        - to: "bean:{{toolsCallBean}}"
+                                        - to: "bean:mcpUiToolsCallPost"
+                                      doCatch:
+                                        - exception:
+                                            - java.lang.Exception
+                                          steps:
+                                            - to: "bean:mcpUiToolsCallPost"
+                                            - setProperty:
+                                                name: mcp.error.code
+                                                constant: "-32603"
+                                            - setProperty:
+                                                name: mcp.error.message
+                                                simple: "UI tool execution failed: ${exception.message}"
+                                            - process:
+                                                ref: mcpError
+                            otherwise:
+                              steps:
+                                - log:
+                                    loggingLevel: WARN
+                                    message: "Unsupported MCP method: ${exchangeProperty[mcp.jsonrpc.method]}"
+                                - setProperty:
+                                    name: mcp.error.code
+                                    constant: "-32601"
+                                - setProperty:
+                                    name: mcp.error.message
+                                    simple: "Unsupported MCP method: ${exchangeProperty[mcp.jsonrpc.method]}"
+                                - process:
+                                    ref: mcpError
+                      doCatch:
+                        - exception:
+                            - java.lang.IllegalArgumentException
                           steps:
-                            - log:
-                                loggingLevel: INFO
-                                message: "MCP Notification received"
-                            - to: "bean:mcpNotification"
-                            - choice:
-                                when:
-                                  - simple: "${exchangeProperty[mcp.notification.type]} == 'initialized'"
-                                    steps:
-                                      - to: "bean:mcpNotificationsInitialized"
-                                otherwise:
-                                  steps:
-                                    - to: "bean:mcpNotificationAck"
-                        # Request methods branch
-                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'initialize'"
-                          steps:
-                            - log:
-                                loggingLevel: INFO
-                                message: "MCP Initialize request received"  
-                            - to: mcpInitialize
-                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'ping'"
-                          steps:
-                            - log:
-                                loggingLevel: INFO
-                                message: "MCP Ping request received"
-                            - to: mcpPing
-                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/list'"
-                          steps:
-                            - log:
-                                loggingLevel: INFO
-                                message: "MCP Tools List request received"
-                            - to: mcpToolsList
-                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'tools/call'"
-                          steps:
-                            - log:
-                                loggingLevel: INFO
-                                message: "MCP Tools Call request for bean {{toolsCallBean}} received"
-                            - to: "bean:{{toolsCallBean}}"
-                        - simple: "${exchangeProperty[mcp.jsonrpc.method]} == 'resources/get'"
-                          steps:
-                            - log:
-                                loggingLevel: INFO
-                                message: "MCP Resources Get request received"
-                            - to: "bean:{{resourcesGetBean}}"
-                      otherwise:
-                        steps:
-                          - log:
-                              loggingLevel: WARN
-                              message: "Unsupported MCP method: ${exchangeProperty[mcp.jsonrpc.method]}"
+                            - setHeader:
+                                name: CamelHttpResponseCode
+                                constant: "400"
+                            - setProperty:
+                                name: mcp.error.code
+                                constant: "-32600"
+                            - setProperty:
+                                name: mcp.error.message
+                                simple: "${exception.message}"
+                            - process:
+                                ref: mcpError
                   - choice:
                       when:
                         - simple: "${body} != null"

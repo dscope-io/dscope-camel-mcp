@@ -1,0 +1,88 @@
+= MCP Component
+:doctitle: MCP
+:shortname: mcp
+:artifactid: camel-mcp
+:description: Camel component for the Model Context Protocol (MCP).
+:since: 1.0
+:supportlevel: Stable
+:tabs-sync-option:
+:component-header: Both producer and consumer are supported
+
+*Since Camel {since}*
+
+*{component-header}*
+
+The MCP component provides integration with the https://modelcontextprotocol.io[Model Context Protocol] (MCP),
+enabling Apache Camel routes to communicate with AI agents using the JSON-RPC 2.0 protocol.
+
+== URI Format
+
+[source]
+----
+mcp:uri[?options]
+----
+
+Where `uri` is the target MCP server endpoint (e.g., `http://localhost:8080/mcp`).
+
+// component-configure options: START
+// component-configure options: END
+
+// component options: START
+include::partial$component-configure-options.adoc[]
+include::partial$component-endpoint-options.adoc[]
+// component options: END
+
+// endpoint options: START
+// endpoint options: END
+
+== Producer
+
+The producer sends MCP JSON-RPC 2.0 requests to a remote MCP server. Supported methods include:
+
+* `initialize` – Initialize an MCP session
+* `ping` – Health check ping
+* `tools/list` – List available tools
+* `tools/call` – Invoke a specific tool
+* `resources/list` – List available resources
+* `resources/read` – Read a specific resource
+
+== Consumer
+
+The consumer exposes an HTTP (or WebSocket) endpoint that acts as an MCP server,
+receiving JSON-RPC 2.0 requests from MCP clients (e.g., AI agents).
+
+The consumer sets the following exchange properties:
+
+* `mcp.jsonrpc.method` – The JSON-RPC method name
+* `mcp.jsonrpc.id` – The JSON-RPC request id
+* `mcp.tool.name` – The tool name (for `tools/call` requests)
+
+== Examples
+
+=== Producer – Call a Tool
+
+[source,yaml]
+----
+- from:
+    uri: "timer:callTool?repeatCount=1"
+    steps:
+      - setBody:
+          constant: '{"name":"echo","arguments":{"message":"hello"}}'
+      - unmarshal:
+          json: {}
+      - to: "mcp:http://localhost:8080/mcp?method=tools/call"
+      - log: "${body}"
+----
+
+=== Consumer – Expose an MCP Server
+
+[source,java]
+----
+from("mcp:http://0.0.0.0:3000/mcp")
+    .choice()
+        .when(exchangeProperty("mcp.jsonrpc.method").isEqualTo("tools/list"))
+            .setBody(constant("{\"tools\":[]}"))
+        .when(exchangeProperty("mcp.jsonrpc.method").isEqualTo("tools/call"))
+            .process(exchange -> { /* handle tool call */ })
+    .end();
+----

@@ -3,9 +3,8 @@ package io.dscope.camel.mcp;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.main.Main;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class McpComponentTest {
 
@@ -17,7 +16,7 @@ public class McpComponentTest {
 
     CamelContext context = main.getCamelContext();
     ProducerTemplate template = context.createProducerTemplate();
-        String response = template.requestBody("http://localhost:8080/mcp",
+        String response = template.requestBody("http://localhost:18080/mcp",
                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}",
                 String.class);
 

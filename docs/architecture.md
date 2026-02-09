@@ -126,6 +126,28 @@ Fetches a resource by name or URI.
 
 Returns resource content (format depends on type - see below).
 
+### `resources/read`
+
+Reads a resource by URI from the resource catalog. Similar to `resources/get` but uses URI-based lookup via `McpResourceCatalog`.
+
+| Field | Description |
+|-------|-------------|
+| `params.uri` | Resource URI to read |
+
+Returns resource contents array with `uri`, `mimeType`, and `text` or `blob`.
+
+### `health`
+
+Returns server health status including optional rate limiter statistics.
+
+No parameters required. Returns `{ "status": "ok" }` with optional `rateLimiter` snapshot.
+
+### `stream`
+
+Provides SSE (Server-Sent Events) handshake for streaming transport.
+
+Returns `:ok\n\n` with `text/event-stream` content type.
+
 ## MCP Apps Bridge Methods
 
 The component implements the [MCP Apps Bridge](https://modelcontextprotocol.io/specification/2025-06-18/client/apps-bridge) specification for embedding interactive UIs within AI agent workflows.
@@ -202,7 +224,7 @@ Returns tool execution result. The session is validated before execution.
   - `McpUiUpdateModelContextProcessor` - Updates model context with merge/replace modes
   - `McpUiToolsCallProcessor` - Validates session before delegating to tool processor
   
-  Sessions are managed by `McpUiSessionRegistry` with configurable TTL (default: 30 minutes).
+  Sessions are managed by `McpUiSessionRegistry` with configurable TTL (default: 1 hour).
 
 ## Transport Layer
 
@@ -237,10 +259,45 @@ from:
 
 Both transports share the same processor pipeline:
 1. `mcpRequestSizeGuard` - Validates request size limits
-2. `mcpRateLimit` - Applies rate limiting
-3. `mcpJsonRpcEnvelope` - Parses JSON-RPC envelope, extracts method
-4. Choice block - Routes to method-specific processor
-5. Response serialization
+2. `mcpHttpValidator` - Validates HTTP headers (Accept, Content-Type) for MCP Streamable HTTP transport (HTTP only)
+3. `mcpRateLimit` - Applies rate limiting
+4. `mcpJsonRpcEnvelope` - Parses JSON-RPC envelope, extracts method
+5. Choice block - Routes to method-specific processor
+6. Response serialization
+
+## Generated Artifacts & Tooling
+
+### Camel Component Descriptor
+
+The `camel-package-maven-plugin` generates standard Camel component metadata from `@UriEndpoint` annotations:
+
+```
+src/generated/
+├── resources/META-INF/io/dscope/camel/mcp/mcp.json   # Component JSON descriptor
+└── java/.../
+    ├── McpEndpointConfigurer.java      # Auto-configurer for endpoint properties
+    ├── McpComponentConfigurer.java     # Auto-configurer for component properties
+    └── McpEndpointUriFactory.java      # URI factory for endpoint URIs
+```
+
+The `mcp.json` descriptor is the authoritative property catalog, enabling IDE autocompletion, documentation generation, and property validation.
+
+### Apache Karavan Metadata
+
+The `karavan-metadata` Maven profile generates visual designer metadata:
+
+```
+src/main/resources/karavan/metadata/
+├── component/mcp.json         # Component descriptor with method enums
+├── mcp-methods.json            # 13 request + 3 notification methods catalog
+├── kamelet/mcp-rest-service.json   # REST kamelet descriptor
+├── kamelet/mcp-ws-service.json     # WebSocket kamelet descriptor
+└── model-labels.json           # Human-friendly labels for UI
+```
+
+### AsciiDoc Documentation
+
+`src/main/docs/mcp-component.adoc` follows Camel's standard component AsciiDoc format with auto-updated option tables.
 
 ## Extensibility
 

@@ -6,8 +6,8 @@
 
 | Channel | Version | Maven Coordinate | Notes |
 | --- | --- | --- | --- |
-| Latest Release | 1.2.0 | `io.dscope.camel:camel-mcp:1.2.0` | Recommended for production use |
-| Development Snapshot | 1.2.0 | `io.dscope.camel:camel-mcp:1.2.0` | Build from source (`mvn install`) to track `main` |
+| Latest Release | 1.3.0 | `io.dscope.camel:camel-mcp:1.3.0` | Recommended for production use |
+| Development Snapshot | 1.3.0 | `io.dscope.camel:camel-mcp:1.3.0` | Build from source (`mvn install`) to track `main` |
 
 ## 📋 Requirements
 
@@ -17,11 +17,16 @@
 
 ## 🚀 Features
 
-- Implements core MCP JSON-RPC methods: `initialize`, `ping`, `resources/list`, `resources/get`, `tools/list`, and `tools/call`.
+- **Producer (client) mode**: Send MCP JSON-RPC requests to remote servers via `to("mcp:http://host/mcp?method=tools/list")`.
+- **Consumer (server) mode**: Expose MCP endpoints with `from("mcp:http://0.0.0.0:3000/mcp")` — built-in request validation, JSON-RPC parsing, rate limiting, and response serialization.
+- Implements core MCP methods: `initialize`, `ping`, `resources/list`, `resources/read`, `resources/get`, `tools/list`, `tools/call`, `health`, and `stream`.
 - **MCP Apps Bridge support**: `ui/initialize`, `ui/message`, `ui/update-model-context`, and `ui/tools/call` for embedded UI integration.
-- Sends MCP traffic over standard Camel HTTP clients and exposes WebSocket helpers for streaming scenarios.
-- Ships registry processors for JSON-RPC envelopes, tool catalogs, and notification workflows.
-- Sample service and Postman collections to exercise MCP flows end-to-end.
+- **Notifications**: `notifications/initialized`, `notifications/cancelled`, `notifications/progress`.
+- HTTP and WebSocket transports for both producer and consumer modes.
+- Ships 20+ registry processors for JSON-RPC envelopes, tool catalogs, resource catalogs, and notification workflows.
+- **Apache Karavan integration**: Generated visual designer metadata for drag-and-drop MCP route building.
+- **Camel tooling support**: `@UriEndpoint`-based component descriptor generation (`mcp.json`) for IDE autocompletion and documentation.
+- Two sample projects and Postman collections to exercise MCP flows end-to-end.
 
 📖 **[Development Guide](docs/development.md)** - Learn how to build your own MCP services with YAML and Java routes.
 
@@ -33,7 +38,7 @@
 <dependency>
   <groupId>io.dscope.camel</groupId>
   <artifactId>camel-mcp</artifactId>
-  <version>1.2.0</version>
+  <version>1.3.0</version>
 </dependency>
 ```
 
@@ -309,7 +314,7 @@ Response includes a `sessionId` for subsequent UI calls:
 {
   "result": {
     "sessionId": "abc123-...",
-    "hostInfo": {"name": "camel-mcp", "version": "1.2.0"},
+    "hostInfo": {"name": "camel-mcp", "version": "1.3.0"},
     "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
   }
 }
@@ -533,12 +538,30 @@ The integration test boots a mock MCP server defined in `src/test/resources/rout
 
 ## 🧰 Samples
 
-```bash
-# Core component smoke test
-mvn exec:java -Dexec.mainClass=org.apache.camel.main.Main
+### mcp-service (Kamelet/YAML routes)
 
-# Sample MCP service (HTTP + WebSocket)
+Full-featured MCP server with Kamelet-based routing, UI Bridge, resource catalog, and OpenAPI generation.
+
+```bash
 mvn -f samples/mcp-service/pom.xml exec:java
+# HTTP: http://localhost:8080/mcp  |  WebSocket: ws://localhost:8090/mcp
+```
+
+### mcp-consumer (Direct consumer URI)
+
+Minimal MCP server demonstrating the `from("mcp:...")` consumer approach — pure Java, no YAML needed.
+
+```bash
+mvn -f samples/mcp-consumer/pom.xml exec:java
+# HTTP: http://localhost:3000/mcp  |  WebSocket: ws://localhost:3001/mcp
+```
+
+See [samples/mcp-consumer/README.md](samples/mcp-consumer/README.md) for details and curl examples.
+
+### Core component smoke test
+
+```bash
+mvn exec:java -Dexec.mainClass=org.apache.camel.main.Main
 ```
 
 When the sample is running you can exercise the MCP HTTP endpoint:
@@ -562,16 +585,59 @@ curl -s -H "Content-Type: application/json" -H "Accept: application/json, text/e
 
 HTTP endpoints listen on `http://localhost:8080`; WebSocket helpers are available on `ws://localhost:8090/mcp`. Generated OpenAPI definitions live under `samples/mcp-service/target/openapi/`. Postman collections are bundled in `samples/mcp-service/postman/` for interactive exploration.
 
+## 🔌 IDE & Tooling Integration
+
+### Camel Component Descriptor
+
+The build generates a standard Camel component descriptor at `src/generated/resources/META-INF/io/dscope/camel/mcp/mcp.json`. This enables:
+- IDE autocompletion for `mcp:` URIs in YAML / Java routes
+- Auto-generated option tables in documentation
+- Property validation via `McpEndpointConfigurer` and `McpComponentConfigurer`
+
+Additional Camel-standard properties are exposed automatically: `bridgeErrorHandler`, `lazyStartProducer`, `exceptionHandler`, `exchangePattern`, `autowiredEnabled`.
+
+### Apache Karavan Integration
+
+Generate visual designer metadata for [Apache Karavan](https://camel.apache.org/camel-karavan/):
+
+```bash
+mvn -Pkaravan-metadata compile exec:java
+```
+
+This produces metadata under `src/main/resources/karavan/metadata/`:
+
+| File | Purpose |
+|------|---------|
+| `component/mcp.json` | Component descriptor with all properties and method enums |
+| `mcp-methods.json` | Catalog of 13 request methods + 3 notification methods |
+| `kamelet/mcp-rest-service.json` | REST kamelet descriptor (port 8080) |
+| `kamelet/mcp-ws-service.json` | WebSocket kamelet descriptor (port 8090) |
+| `model-labels.json` | Human-friendly labels for methods and kamelets |
+
+Regenerate after adding new MCP methods or changing component properties.
+
 ## 🧱 Project Layout
 
 ```
 io.dscope.camel.mcp/
 ├── McpComponent        # Camel component entry point
-├── McpEndpoint         # Holds configuration and producer/consumer instances
-├── McpProducer         # Sends MCP JSON-RPC requests over HTTP
-├── McpConsumer         # Planned inbound server (stub)
-├── processor/          # JSON-RPC request/response helpers and tool processors
-└── model/              # Jackson POJOs for MCP requests/responses
+├── McpEndpoint         # Holds configuration, creates producer/consumer (@UriEndpoint, Category.AI)
+├── McpConfiguration    # URI path/param bindings with Camel annotations
+├── McpProducer         # Sends MCP JSON-RPC requests to remote servers (client mode)
+├── McpConsumer         # Receives MCP requests via HTTP/WebSocket (server mode)
+├── processor/          # 20+ built-in processors for JSON-RPC, tools, resources, UI, notifications
+├── catalog/            # McpMethodCatalog + McpResourceCatalog (loaded from YAML)
+├── service/            # McpUiSessionRegistry, McpWebSocketNotifier
+├── model/              # Jackson POJOs: requests, responses, resources, UI sessions, notifications
+└── tools/karavan/      # McpKaravanMetadataGenerator for Karavan visual designer
+
+samples/
+├── mcp-service/        # Full-featured MCP server using Kamelets/YAML routes (port 8080/8090)
+└── mcp-consumer/       # Minimal MCP server using direct consumer URI (port 3000/3001)
+
+src/generated/          # Auto-generated component descriptors (mcp.json, configurers, URI factory)
+src/main/resources/karavan/metadata/  # Generated Karavan metadata (component, kamelets, labels)
+src/main/docs/mcp-component.adoc      # AsciiDoc component documentation for Camel tooling
 ```
 
 ## 📄 License

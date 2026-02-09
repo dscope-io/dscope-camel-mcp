@@ -1,0 +1,22 @@
+{
+  "kamelet.mcp-rest-service.description" : "Exposes an MCP-compliant JSON-RPC server over HTTP using Undertow.",
+  "kamelet.mcp-rest-service.title" : "MCP REST Service",
+  "kamelet.mcp-ws-service.description" : "Exposes an MCP-compliant JSON-RPC server over WebSocket using Undertow.",
+  "kamelet.mcp-ws-service.title" : "MCP WebSocket Service",
+  "method.health" : "Return overall health/status of the server.",
+  "method.initialize" : "Initialize the MCP session and negotiate capabilities.",
+  "method.notifications/cancelled" : "Cancel a running operation.",
+  "method.notifications/initialized" : "Sent by client after initialize handshake.",
+  "method.notifications/progress" : "Report progress for a long-running operation.",
+  "method.ping" : "Health-check ping; the server replies immediately.",
+  "method.resources/get" : "Stream or fetch a resource.",
+  "method.resources/list" : "List available resources.",
+  "method.resources/read" : "Read the content of a specific resource.",
+  "method.stream" : "Open a bidirectional streaming channel.",
+  "method.tools/call" : "Invoke a named tool with arguments.",
+  "method.tools/list" : "List all tools the server exposes.",
+  "method.ui/initialize" : "Initialize an MCP Apps Bridge UI session.",
+  "method.ui/message" : "Send a message through the UI bridge.",
+  "method.ui/tools/call" : "Call a tool within a UI session.",
+  "method.ui/update-model-context" : "Push updated model context to the UI."
+}
