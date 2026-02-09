@@ -48,22 +48,22 @@ public class McpUiMessageProcessor extends AbstractMcpResponseProcessor {
             return; // Error already written
         }
 
-        // Extract message content
-        String message = params != null ? (String) params.get("message") : null;
+        // Extract message content – may be a plain String or a structured Map
+        Object rawMessage = params != null ? params.get("message") : null;
         String type = params != null ? (String) params.get("type") : null;
 
-        if (message == null || message.isBlank()) {
+        if (rawMessage == null || (rawMessage instanceof String s && s.isBlank())) {
             writeError(exchange, createError(-32602, "Missing required parameter: message"), 400);
             return;
         }
 
-        // Store message on exchange for downstream processing
-        exchange.setProperty(EXCHANGE_PROPERTY_UI_MESSAGE, message);
+        // Store message on exchange for downstream processing (preserves original type)
+        exchange.setProperty(EXCHANGE_PROPERTY_UI_MESSAGE, rawMessage);
         if (type != null) {
             exchange.setProperty(EXCHANGE_PROPERTY_UI_MESSAGE_TYPE, type);
         }
 
-        LOG.info("UI Message from session {}: type={} message={}", sessionId, type, message);
+        LOG.info("UI Message from session {}: type={} message={}", sessionId, type, rawMessage);
 
         // Acknowledge receipt
         Map<String, Object> result = newResultMap();

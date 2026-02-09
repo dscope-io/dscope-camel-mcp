@@ -12,7 +12,7 @@ This guide explains how to build MCP services using the Camel MCP component. You
     <dependency>
         <groupId>io.dscope.camel</groupId>
         <artifactId>camel-mcp</artifactId>
-        <version>1.2.0</version>
+        <version>1.3.0</version>
     </dependency>
     
     <!-- Camel runtime -->
@@ -62,6 +62,68 @@ my-mcp-service/
         └── mcp/
             └── methods.yaml               # Tool catalog
 ```
+
+## Creating MCP Servers
+
+There are three approaches to building MCP servers, from simplest to most flexible:
+
+### Approach 1: Direct Consumer Component (Simplest)
+
+Use `from("mcp:...")` for the simplest possible MCP server. The consumer handles all protocol details automatically:
+
+```java
+import org.apache.camel.main.Main;
+import org.apache.camel.builder.RouteBuilder;
+
+public class MyMcpServer {
+    public static void main(String[] args) throws Exception {
+        Main main = new Main();
+        main.configure().addRoutesBuilder(new RouteBuilder() {
+            @Override
+            public void configure() {
+                // HTTP server on port 3000
+                from("mcp:http://0.0.0.0:3000/mcp")
+                    .process(exchange -> {
+                        String method = exchange.getProperty("mcp.jsonrpc.method", String.class);
+                        String toolName = exchange.getProperty("mcp.tool.name", String.class);
+                        
+                        switch (method) {
+                            case "initialize" -> exchange.getMessage().setBody(Map.of(
+                                "protocolVersion", "2024-11-05",
+                                "serverInfo", Map.of("name", "my-server", "version", "1.0.0"),
+                                "capabilities", Map.of("tools", Map.of("listChanged", true))
+                            ));
+                            case "tools/list" -> exchange.getMessage().setBody(Map.of(
+                                "tools", List.of(Map.of("name", "echo", "description", "Echoes input"))
+                            ));
+                            case "tools/call" -> exchange.getMessage().setBody(Map.of(
+                                "content", List.of(Map.of("type", "text", "text", "Echo: " + toolName))
+                            ));
+                            default -> exchange.getMessage().setBody(Map.of());
+                        }
+                    });
+                
+                // WebSocket server on port 3001
+                from("mcp:http://0.0.0.0:3001/mcp?websocket=true")
+                    .process(exchange -> { /* same logic */ });
+            }
+        });
+        main.run(args);
+    }
+}
+```
+
+The consumer automatically provides: request size validation, HTTP header validation, rate limiting, JSON-RPC envelope parsing, and JSON response serialization.
+
+See `samples/mcp-consumer/` for a complete working example with three tools (echo, add, greet).
+
+### Approach 2: YAML Routes with Kamelets
+
+### Approach 3: Java RouteBuilder with Undertow
+
+For full control over the processor pipeline, use Undertow directly with the built-in processors.
+
+---
 
 ## Creating Routes in YAML
 
@@ -494,15 +556,20 @@ The component provides these pre-registered processors:
 | Processor | Registry Name | Purpose |
 |-----------|---------------|---------|
 | `McpJsonRpcEnvelopeProcessor` | `mcpJsonRpcEnvelope` | Parses JSON-RPC, extracts method/id |
+| `McpHttpValidatorProcessor` | `mcpHttpValidator` | Validates Accept/Content-Type headers for MCP Streamable HTTP |
 | `McpInitializeProcessor` | `mcpInitialize` | Handles `initialize` method |
 | `McpPingProcessor` | `mcpPing` | Handles `ping` health check |
 | `McpToolsListProcessor` | `mcpToolsList` | Returns tool catalog from `methods.yaml` |
 | `McpResourcesListProcessor` | `mcpResourcesList` | Returns resource catalog from `resources.yaml` |
 | `McpResourcesGetProcessor` | `mcpResourcesGet` | Base class for resource handling |
+| `McpResourcesReadProcessor` | `mcpResourcesRead` | Reads resources by URI from catalog |
 | `McpErrorProcessor` | `mcpError` | Formats JSON-RPC error responses |
 | `McpNotificationProcessor` | `mcpNotification` | Handles notification messages |
+| `McpNotificationAckProcessor` | `mcpNotificationAck` | Generic notification acknowledgement (204) |
 | `McpRequestSizeGuardProcessor` | `mcpRequestSizeGuard` | Validates request size limits |
 | `McpRateLimitProcessor` | `mcpRateLimit` | Applies rate limiting |
+| `McpHealthStatusProcessor` | `mcpHealthStatus` | Returns health status with rate limiter snapshot |
+| `McpStreamProcessor` | `mcpStream` | SSE handshake for streaming transport |
 | `McpUiInitializeProcessor` | `mcpUiInitialize` | Creates UI sessions |
 | `McpUiMessageProcessor` | `mcpUiMessage` | Handles UI messages |
 | `McpUiUpdateModelContextProcessor` | `mcpUiUpdateModelContext` | Updates model context |
@@ -603,3 +670,45 @@ curl -s -X POST http://localhost:8080/mcp \
 5. **Add rate limiting** - Use `mcpRateLimit` processor for production services
 6. **Validate input** - Check parameters before processing
 7. **Use content type detection** - Leverage `isBinaryResource()`, `getMimeType()` helpers
+8. **Try the consumer first** - For simple servers, `from("mcp:...")` is easier than manual Undertow routes
+
+## Catalog APIs
+
+### McpMethodCatalog
+
+Registered as `mcpMethodCatalog` via `@BindToRegistry`. Loads tool definitions from `classpath:mcp/methods.yaml`.
+
+```java
+// List all tools
+List<McpMethodDefinition> tools = mcpMethodCatalog.list();
+
+// Find a specific tool
+McpMethodDefinition tool = mcpMethodCatalog.findByName("echo");
+```
+
+### McpResourceCatalog
+
+Registered as `mcpResourceCatalog` via `@BindToRegistry`. Loads resource definitions from `classpath:mcp/resources.yaml`.
+
+```java
+// List all resources
+List<McpResourceDefinition> resources = mcpResourceCatalog.list();
+
+// Find by URI
+McpResourceDefinition res = mcpResourceCatalog.findByUri("resource://data/config");
+
+// Check existence
+boolean exists = mcpResourceCatalog.hasResource("resource://data/config");
+```
+
+## Karavan Metadata Generation
+
+Generate visual designer metadata for [Apache Karavan](https://camel.apache.org/camel-karavan/):
+
+```bash
+mvn -Pkaravan-metadata compile exec:java
+```
+
+This runs `McpKaravanMetadataGenerator` which produces files under `src/main/resources/karavan/metadata/`. Regenerate after adding new MCP methods or changing component properties.
+
+The generator is located at `src/main/java/io/dscope/tools/karavan/McpKaravanMetadataGenerator.java`.

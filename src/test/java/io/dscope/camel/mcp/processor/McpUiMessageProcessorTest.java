@@ -106,6 +106,47 @@ class McpUiMessageProcessorTest {
     }
 
     @Test
+    void shouldAcknowledgeStructuredMessage() throws Exception {
+        McpUiSessionRegistry registry = new McpUiSessionRegistry();
+        McpUiSession session = registry.register("ui://test.com/app");
+        McpUiMessageProcessor processor = new McpUiMessageProcessor(registry);
+        
+        try (DefaultCamelContext ctx = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(ctx);
+            exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID, "msg-map");
+            exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, "2025-06-18");
+            exchange.setProperty(McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID, session.getSessionId());
+            
+            Map<String, Object> messageObj = new LinkedHashMap<>();
+            messageObj.put("role", "user");
+            messageObj.put("content", "Hello from app");
+            
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("message", messageObj);
+            params.put("type", "chat");
+            exchange.getIn().setBody(params);
+
+            processor.process(exchange);
+
+            String body = exchange.getIn().getBody(String.class);
+            assertNotNull(body);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> envelope = MAPPER.readValue(body, Map.class);
+            
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) envelope.get("result");
+            assertNotNull(result);
+            assertEquals(true, result.get("acknowledged"));
+            
+            // Verify structured message was stored on exchange
+            Object storedMessage = exchange.getProperty(McpUiMessageProcessor.EXCHANGE_PROPERTY_UI_MESSAGE);
+            assertNotNull(storedMessage);
+            assertEquals(messageObj, storedMessage);
+        }
+    }
+
+    @Test
     void shouldAcceptSessionIdFromHeader() throws Exception {
         McpUiSessionRegistry registry = new McpUiSessionRegistry();
         McpUiSession session = registry.register("ui://test.com/app");
@@ -117,7 +158,7 @@ class McpUiMessageProcessorTest {
             exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, "2025-06-18");
             // Set session ID via header instead of property
             exchange.getIn().setHeader("X-MCP-Session-Id", session.getSessionId());
-            
+
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("message", "Hello via header");
             exchange.getIn().setBody(params);

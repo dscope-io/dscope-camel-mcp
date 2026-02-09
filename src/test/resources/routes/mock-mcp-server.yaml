@@ -2,7 +2,7 @@
 - route:
     id: mock-mcp-server
     from:
-      uri: "undertow:http://0.0.0.0:8080/mcp?httpMethodRestrict=POST"
+      uri: "undertow:http://0.0.0.0:18080/mcp?httpMethodRestrict=POST"
       steps:
         - unmarshal:
             json:

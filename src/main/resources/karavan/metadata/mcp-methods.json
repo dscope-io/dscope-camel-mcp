@@ -1,0 +1,85 @@
+{
+  "kind" : "mcp-methods",
+  "title" : "MCP Methods",
+  "methods" : [ {
+    "name" : "initialize",
+    "group" : "Core",
+    "description" : "Initialize the MCP session and negotiate capabilities.",
+    "type" : "request"
+  }, {
+    "name" : "ping",
+    "group" : "Core",
+    "description" : "Health-check ping; the server replies immediately.",
+    "type" : "request"
+  }, {
+    "name" : "tools/list",
+    "group" : "Tools",
+    "description" : "List all tools the server exposes.",
+    "type" : "request"
+  }, {
+    "name" : "tools/call",
+    "group" : "Tools",
+    "description" : "Invoke a named tool with arguments.",
+    "type" : "request"
+  }, {
+    "name" : "resources/list",
+    "group" : "Resources",
+    "description" : "List available resources.",
+    "type" : "request"
+  }, {
+    "name" : "resources/read",
+    "group" : "Resources",
+    "description" : "Read the content of a specific resource.",
+    "type" : "request"
+  }, {
+    "name" : "resources/get",
+    "group" : "Resources",
+    "description" : "Stream or fetch a resource.",
+    "type" : "request"
+  }, {
+    "name" : "health",
+    "group" : "Core",
+    "description" : "Return overall health/status of the server.",
+    "type" : "request"
+  }, {
+    "name" : "stream",
+    "group" : "Core",
+    "description" : "Open a bidirectional streaming channel.",
+    "type" : "request"
+  }, {
+    "name" : "ui/initialize",
+    "group" : "UI Bridge",
+    "description" : "Initialize an MCP Apps Bridge UI session.",
+    "type" : "request"
+  }, {
+    "name" : "ui/message",
+    "group" : "UI Bridge",
+    "description" : "Send a message through the UI bridge.",
+    "type" : "request"
+  }, {
+    "name" : "ui/update-model-context",
+    "group" : "UI Bridge",
+    "description" : "Push updated model context to the UI.",
+    "type" : "request"
+  }, {
+    "name" : "ui/tools/call",
+    "group" : "UI Bridge",
+    "description" : "Call a tool within a UI session.",
+    "type" : "request"
+  }, {
+    "name" : "notifications/initialized",
+    "group" : "Notifications",
+    "description" : "Sent by client after initialize handshake.",
+    "type" : "notification"
+  }, {
+    "name" : "notifications/cancelled",
+    "group" : "Notifications",
+    "description" : "Cancel a running operation.",
+    "type" : "notification"
+  }, {
+    "name" : "notifications/progress",
+    "group" : "Notifications",
+    "description" : "Report progress for a long-running operation.",
+    "type" : "notification"
+  } ]
+}

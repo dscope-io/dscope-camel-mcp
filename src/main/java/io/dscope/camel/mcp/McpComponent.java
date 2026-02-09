@@ -10,6 +10,7 @@ public class McpComponent extends DefaultComponent {
     @Override
     protected Endpoint createEndpoint(String uri, String remaining, Map<String, Object> parameters) throws Exception {
         McpConfiguration config = new McpConfiguration();
+        config.setUri(remaining);  // Set the URI from the remaining part
         setProperties(config, parameters);
         return new McpEndpoint(uri, this, config);
     }

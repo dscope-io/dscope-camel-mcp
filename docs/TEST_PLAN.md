@@ -59,7 +59,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
     "protocolVersion": "2025-06-18",
     "serverInfo": {
       "name": "camel-mcp",
-      "version": "1.2.0"
+      "version": "1.3.0"
     },
     "capabilities": {
       "tools": { "listChanged": true },
@@ -288,7 +288,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
     "sessionId": "<UUID>",
     "hostInfo": {
       "name": "camel-mcp-host",
-      "version": "1.2.0"
+      "version": "1.3.0"
     },
     "capabilities": {
       "tools/call": true,
@@ -554,7 +554,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
 {
   "status": "UP",
   "timestamp": "...",
-  "version": "1.2.0"
+  "version": "1.3.0"
 }
 ```
 
@@ -620,27 +620,27 @@ curl -X POST http://localhost:8080/mcp \
 | Test Case | Status | Notes |
 |-----------|--------|-------|
 | 1.1 Initialize | ✅ | Returns protocolVersion, serverInfo, capabilities including ui |
-| 1.2 Ping | ✅ | Returns empty result |
-| 1.3 Tools List | ✅ | Returns echo, summarize, chart-editor with UI annotations |
-| 1.4 Tools Call - Echo | ✅ | Returns text content |
-| 1.5 Tools Call - Summarize | ✅ | Truncates and adds ellipsis |
-| 1.6 Resources List | ✅ | Returns chart-editor.html and other resources |
-| 1.7 Resources Get | ⬜ | |
-| 2.1 UI Initialize | ✅ | Returns sessionId, hostInfo, capabilities |
-| 2.2 UI Message | ✅ | Returns acknowledged: true |
-| 2.3 UI Update Model Context | ✅ | Returns acknowledged: true with mode |
-| 2.4 UI Tools Call | ✅ | Fixed in v1.2.0 - returns tool result correctly |
-| 2.5 Invalid Session | ⬜ | |
-| 3.1 WebSocket Connection | ⬜ | |
+| 1.2 Ping | ✅ | Returns `{ok:true, timestamp}` (not empty result per spec) |
+| 1.3 Tools List | ✅ | Returns 6 calendar tools (calendar.listAvailability, bookAppointment, etc.) |
+| 1.4 Tools Call | ✅ | calendar.listAvailability returns real availability slots |
+| 1.5 Tools Call - Validation | ✅ | Missing required args returns -32602 with descriptive message |
+| 1.6 Resources List | ✅ | Returns appointment booking UI resources |
+| 1.7 Resources Read | ✅ | Returns 37KB HTML content for ui://appointment/booking |
+| 2.1 UI Initialize | ❌ | Kamelet route missing ui/* method handlers — returns -32601 |
+| 2.2 UI Message | ❌ | Not routed in kamelet (ui/initialize prerequisite) |
+| 2.3 UI Update Model Context | ❌ | Not routed in kamelet |
+| 2.4 UI Tools Call | ❌ | Not routed in kamelet |
+| 2.5 Invalid Session | ⬜ | Blocked by 2.1 |
+| 3.1 WebSocket Connection | ⬜ | WS on port 8090 — not tested (needs wscat) |
 | 3.2 WebSocket UI Session | ⬜ | |
-| 3.3 Notification Flow | ⬜ | |
-| 4.1 Invalid Method | ⬜ | |
-| 4.2 Invalid JSON | ⬜ | |
-| 4.3 Missing Parameters | ⬜ | |
-| 4.4 Unknown Tool | ⬜ | |
-| 5.1 Normal Load | ⬜ | |
-| 5.2 Burst Load | ⬜ | |
-| 6.1 Health Endpoint | ⬜ | |
+| 3.3 Notification Flow | ❌ | notifications/initialized returns -32601 (not routed in kamelet) |
+| 4.1 Invalid Method | ✅ | Returns -32602 "Unsupported MCP method" |
+| 4.2 Invalid JSON | ✅ | Returns -32602 "Unable to parse JSON-RPC payload" |
+| 4.3 Missing Parameters | ✅ | Returns -32602 "params.name is required for tools/call" |
+| 4.4 Unknown Tool | ✅ | Returns -32601 "Unknown tool: nonexistent-tool" |
+| 5.1 Normal Load | ✅ | 10 requests all returned 200 |
+| 5.2 Burst Load | ✅ | 50 concurrent requests all returned 200 (no rate limiting triggered) |
+| 6.1 Health Endpoint | ❌ | GET /mcp/health returns 500 Internal Server Error |
 
 Legend: ✅ Pass | ❌ Fail | ⬜ Not Tested
 
@@ -648,7 +648,7 @@ Legend: ✅ Pass | ❌ Fail | ⬜ Not Tested
 
 ## Changelog
 
-### v1.2.0 (2025-01-xx)
+### v1.3.0 (2025-01-xx)
 - **Bug Fix**: Fixed `ui/tools/call` returning empty text response
   - **Root Cause**: `McpJsonRpcEnvelopeProcessor.handleUiToolsCall()` was setting property `"mcp.uiSessionId"` but processors looked for `"mcp.ui.sessionId"` (via `EXCHANGE_PROPERTY_UI_SESSION_ID` constant)
   - **Solution**: Updated to use the constant `McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID` consistently
@@ -679,3 +679,414 @@ Legend: ✅ Pass | ❌ Fail | ⬜ Not Tested
 4. **WebSocket connection refused**
    - Ensure WS route is loaded (port 8090)
    - Check firewall settings
+
+---
+
+## Consumer Component Tests
+
+The MCP Consumer allows creating MCP servers programmatically through Camel routes. These tests validate the consumer functionality.
+
+### 7.1 HTTP Consumer Basic Operation
+
+**Test**: `McpConsumerTest.testHttpConsumerStartsAndResponds`
+
+```java
+from("mcp:http://localhost:9876/test")
+    .process(exchange -> {
+        Map<String, Object> response = Map.of(
+            "jsonrpc", "2.0",
+            "id", exchange.getProperty("mcp.jsonrpc.id"),
+            "result", Map.of("echo", "pong")
+        );
+        exchange.getMessage().setBody(response);
+    });
+```
+
+**Request**:
+```bash
+curl -X POST http://localhost:9876/test \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"test-1","method":"ping"}'
+```
+
+**Validation**:
+- [ ] Consumer starts and binds to port
+- [ ] Request is received and processed
+- [ ] Response contains JSON-RPC 2.0 envelope
+- [ ] Consumer stops cleanly on shutdown
+
+---
+
+### 7.2 WebSocket Consumer Configuration
+
+**Test**: `McpConsumerTest.testWebSocketConsumerConfiguration`
+
+```java
+from("mcp:http://localhost:9877/ws?websocket=true")
+    .process(exchange -> {
+        Map<String, Object> response = Map.of(
+            "jsonrpc", "2.0",
+            "result", Map.of("status", "ok")
+        );
+        exchange.getMessage().setBody(response);
+    });
+```
+
+**Validation**:
+- [ ] WebSocket consumer starts without errors
+- [ ] Route context is active
+- [ ] Can accept WebSocket connections
+
+---
+
+### 7.3 JSON-RPC Envelope Parsing
+
+**Test**: `McpConsumerTest.testConsumerWithJsonRpcParsing`
+
+Validates that the consumer:
+- Extracts `method` from JSON-RPC request
+- Sets exchange property `mcp.jsonrpc.method`
+- Makes it available to user processor
+
+**Validation**:
+- [ ] Method extracted: `tools/list`
+- [ ] Exchange property set correctly
+- [ ] User processor can access the method
+
+---
+
+### 7.4 Consumer Lifecycle Management
+
+**Test**: `McpConsumerTest.testConsumerStopsCleanly`
+
+**Validation**:
+- [ ] Consumer starts successfully
+- [ ] Consumer stops without exceptions
+- [ ] No resource leaks (ports, connections)
+- [ ] Undertow server shuts down properly
+
+---
+
+## Integration Test Scenarios
+
+### 8.1 End-to-End Consumer Flow
+
+**Setup**:
+1. Start consumer route with custom processor
+2. Send MCP initialize request
+3. Send tools/list request
+4. Send tools/call request
+5. Verify all responses
+
+**Expected Results**:
+- All requests processed successfully
+- Responses match MCP specification
+- Exchange properties correctly populated
+
+---
+
+### 8.2 Consumer Error Handling
+
+**Test missing headers**:
+```bash
+curl -X POST http://localhost:9876/test \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"ping"}'
+```
+
+**Expected**: HTTP 400 - Missing Accept header
+
+**Test invalid JSON**:
+```bash
+curl -X POST http://localhost:9876/test \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{invalid json}'
+```
+
+**Expected**: HTTP 400 - Parse error
+
+---
+
+### 8.3 Consumer Rate Limiting
+
+Send 100+ rapid requests to consumer endpoint.
+
+**Validation**:
+- [ ] Rate limit processor invoked
+- [ ] Appropriate throttling applied
+- [ ] Error responses for rate-limited requests
+
+---
+
+## 9. Consumer Sample Integration Tests
+
+The `samples/mcp-consumer/` project demonstrates building an MCP server using
+the consumer component directly — a single `from("mcp:...")` route with a Java
+processor, no Kamelets or YAML routes required.
+
+### Start the Consumer Sample
+
+```bash
+cd samples/mcp-consumer
+mvn compile exec:java
+```
+
+Endpoints:
+- **HTTP**: `http://localhost:3000/mcp`
+- **WebSocket**: `ws://localhost:3001/mcp`
+
+---
+
+### 9.1 Initialize (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{}}'
+```
+
+**Expected**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "result": {
+    "protocolVersion": "2025-06-18",
+    "serverInfo": { "name": "mcp-consumer-sample", "version": "1.3.0" },
+    "capabilities": { "tools/list": true, "tools/call": true, "ping": true, "resources/list": true }
+  }
+}
+```
+
+**Validation**:
+- [ ] Returns `protocolVersion: "2025-06-18"`
+- [ ] `serverInfo.name` is `"mcp-consumer-sample"`
+- [ ] Capabilities list supported methods
+
+---
+
+### 9.2 Ping (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"2","method":"ping"}'
+```
+
+**Expected**:
+```json
+{ "jsonrpc": "2.0", "id": "2", "result": { "ok": true } }
+```
+
+**Validation**:
+- [ ] Returns `result.ok: true`
+
+---
+
+### 9.3 Tools List (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"3","method":"tools/list","params":{}}'
+```
+
+**Expected**: Array containing tools `echo`, `add`, `greet`, each with `name`, `description`, `inputSchema`.
+
+**Validation**:
+- [ ] Returns 3 tools
+- [ ] Each tool has `name`, `description`, `inputSchema`
+- [ ] `echo` requires `text` (string)
+- [ ] `add` requires `a`, `b` (number)
+- [ ] `greet` requires `name` (string)
+
+---
+
+### 9.4 Tools Call — echo (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"4","method":"tools/call","params":{"name":"echo","arguments":{"text":"hello world"}}}'
+```
+
+**Expected**:
+```json
+{ "jsonrpc": "2.0", "id": "4", "result": { "content": [{ "type": "text", "text": "hello world" }] } }
+```
+
+**Validation**:
+- [ ] Returns echoed text `"hello world"`
+- [ ] Content type is `"text"`
+
+---
+
+### 9.5 Tools Call — add (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"5","method":"tools/call","params":{"name":"add","arguments":{"a":17,"b":25}}}'
+```
+
+**Expected**:
+```json
+{ "jsonrpc": "2.0", "id": "5", "result": { "content": [{ "type": "text", "text": "42.0" }] } }
+```
+
+**Validation**:
+- [ ] Computes 17 + 25 = 42.0
+- [ ] Returns result as text content
+
+---
+
+### 9.6 Tools Call — greet (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"6","method":"tools/call","params":{"name":"greet","arguments":{"name":"Camel"}}}'
+```
+
+**Expected**:
+```json
+{ "jsonrpc": "2.0", "id": "6", "result": { "content": [{ "type": "text", "text": "Hello, Camel!" }] } }
+```
+
+**Validation**:
+- [ ] Returns personalised greeting
+- [ ] Interpolates name parameter
+
+---
+
+### 9.7 Resources List (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"7","method":"resources/list","params":{}}'
+```
+
+**Expected**: Array containing resource `about` with `uri`, `name`, `description`, `mimeType`.
+
+**Validation**:
+- [ ] Returns 1 resource
+- [ ] `uri` is `"resource://info/about"`
+- [ ] `mimeType` is `"text/plain"`
+
+---
+
+### 9.8 Notification Handling (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+```
+
+**Expected**: HTTP 204 (No Content)
+
+**Validation**:
+- [ ] Returns HTTP 204
+- [ ] No response body
+
+---
+
+### 9.9 Error Handling — Unknown Tool (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"9","method":"tools/call","params":{"name":"nonexistent","arguments":{}}}'
+```
+
+**Expected**:
+```json
+{ "jsonrpc": "2.0", "id": "9", "error": { "code": -32602, "message": "Unknown tool: nonexistent" } }
+```
+
+**Validation**:
+- [ ] Returns JSON-RPC error
+- [ ] Error code is -32602 (invalid params)
+- [ ] Error message identifies the unknown tool
+
+---
+
+### 9.10 Error Handling — Missing Accept Header (Consumer Sample)
+
+**Request**:
+```bash
+curl -s -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"10","method":"ping"}'
+```
+
+**Expected**: HTTP 400 — Missing or invalid Accept header
+
+**Validation**:
+- [ ] Returns HTTP 400
+- [ ] Consumer's HTTP validator rejects the request
+
+---
+
+## Test Automation
+
+All consumer unit tests are automated in:
+- `src/test/java/io/dscope/camel/mcp/McpConsumerTest.java`
+
+Run consumer unit tests:
+```bash
+mvn test -Dtest=McpConsumerTest
+```
+
+Run all unit tests:
+```bash
+mvn test
+```
+
+Current status: **87 tests passing** (including 4 consumer unit tests)
+
+### Consumer Sample Manual Tests
+
+The consumer sample integration tests (Section 9) require a running instance:
+
+```bash
+# Terminal 1 — start the consumer sample
+cd samples/mcp-consumer
+mvn compile exec:java
+
+# Terminal 2 — run the curl tests from Section 9
+```
+
+| #   | Test                              | Expected     |
+|-----|-----------------------------------|--------------|
+| 9.1 | Initialize                        | JSON-RPC result with serverInfo |
+| 9.2 | Ping                              | `{ "ok": true }` |
+| 9.3 | Tools List                        | 3 tools: echo, add, greet |
+| 9.4 | Tools Call — echo                 | Echoed text |
+| 9.5 | Tools Call — add                  | `42.0` |
+| 9.6 | Tools Call — greet                | `"Hello, Camel!"` |
+| 9.7 | Resources List                    | 1 resource |
+| 9.8 | Notification                      | HTTP 204 |
+| 9.9 | Error — Unknown Tool              | JSON-RPC error -32602 |
+| 9.10| Error — Missing Accept Header     | HTTP 400 |

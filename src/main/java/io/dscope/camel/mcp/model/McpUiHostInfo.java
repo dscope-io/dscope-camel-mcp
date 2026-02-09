@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public class McpUiHostInfo {
 
     private static final String DEFAULT_NAME = "camel-mcp";
-    private static final String DEFAULT_VERSION = "1.2.0";
+    private static final String DEFAULT_VERSION = "1.3.0";
 
     private String name;
     private String version;
