@@ -49,16 +49,45 @@ mvn clean install
 
 ### URI Format
 
+**Producer (Client) Mode:**
 ```
 mcp:http://host:port/mcp?method=tools/list
 ```
 
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `method` | `tools/list` | MCP JSON-RPC method to invoke when producing |
-| `configuration.*` | - | Any setters on `McpConfiguration` are available as URI parameters |
+**Consumer (Server) Mode:**
+```
+mcp:http://host:port/path
+mcp:http://host:port/path?websocket=true
+```
+
+### Configuration Options
+
+| Option | Default | Mode | Purpose |
+| --- | --- | --- | --- |
+| `method` | `tools/list` | Producer | MCP JSON-RPC method to invoke when producing |
+| `websocket` | `false` | Consumer | Enable WebSocket transport instead of HTTP |
+| `sendToAll` | `false` | Consumer | Broadcast WebSocket messages to all clients |
+| `allowedOrigins` | `*` | Consumer | CORS allowed origins for WebSocket |
+| `httpMethodRestrict` | `POST` | Consumer | Restrict HTTP methods (e.g., POST, GET) |
+
+### Producer Mode
 
 The exchange body should be a `Map` representing MCP `params`. The producer enriches it with `jsonrpc`, `id`, and the configured `method` before invoking the downstream HTTP endpoint.
+
+### Consumer Mode
+
+The consumer creates an HTTP or WebSocket server endpoint that:
+1. Validates incoming requests (headers, content-type)
+2. Parses JSON-RPC envelopes
+3. Extracts method and parameters to exchange properties
+4. Routes to your processor
+5. Serializes responses to JSON
+
+Exchange properties set by the consumer:
+- `mcp.jsonrpc.type` - REQUEST, NOTIFICATION, or RESPONSE
+- `mcp.jsonrpc.id` - Request ID for responses
+- `mcp.jsonrpc.method` - The MCP method being called
+- `mcp.tool.name` - Tool name (for tools/call)
 
 ## � WebSocket Transport
 
@@ -414,6 +443,73 @@ The `resources/get` method supports automatic content type detection:
         - log:
             message: "Resource payload: ${body[result]}"
 ```
+
+### MCP Server (Consumer) Examples
+
+The MCP consumer allows you to create MCP protocol servers that listen for incoming JSON-RPC requests.
+
+#### Basic HTTP Server
+
+```java
+from("mcp:http://localhost:8080/mcp")
+    .process(exchange -> {
+        // Your custom MCP request processing
+        String method = exchange.getProperty("mcp.jsonrpc.method", String.class);
+        Map<String, Object> params = exchange.getIn().getBody(Map.class);
+        
+        // Process request and set response
+        Map<String, Object> response = Map.of(
+            "jsonrpc", "2.0",
+            "id", exchange.getProperty("mcp.jsonrpc.id"),
+            "result", Map.of("status", "ok")
+        );
+        exchange.getMessage().setBody(response);
+    });
+```
+
+#### WebSocket Server
+
+```java
+from("mcp:http://localhost:8090/mcp?websocket=true")
+    .process(exchange -> {
+        // Process MCP requests over WebSocket
+        // Response automatically serialized to JSON
+    });
+```
+
+#### YAML-Based Server
+
+```yaml
+- route:
+    id: mcp-server
+    from:
+      uri: "mcp:http://0.0.0.0:8080/mcp"
+      steps:
+        - choice:
+            when:
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'ping'"
+                steps:
+                  - setBody:
+                      constant:
+                        jsonrpc: "2.0"
+                        result: {}
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'tools/list'"
+                steps:
+                  - setBody:
+                      constant:
+                        jsonrpc: "2.0"
+                        result:
+                          tools:
+                            - name: "echo"
+                              description: "Echo the input"
+```
+
+The consumer automatically:
+- Validates HTTP headers (Content-Type, Accept)
+- Parses JSON-RPC envelopes
+- Extracts method and parameters as exchange properties
+- Applies rate limiting and request size guards
+- Serializes response bodies to JSON
 
 ## 🤖 MCP Tooling
 

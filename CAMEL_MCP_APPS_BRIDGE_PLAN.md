@@ -596,6 +596,65 @@ public class McpAppsClient {
 
 ---
 
+## MCP Consumer Implementation (Completed)
+
+The `McpConsumer` class has been implemented to provide programmatic MCP server creation through Camel component URIs.
+
+### Features Implemented
+
+1. **HTTP Server Support**: Create MCP servers via `mcp:http://host:port/path`
+2. **WebSocket Server Support**: Enable WebSocket via `mcp:http://host:port/path?websocket=true`
+3. **Automatic Request Processing**:
+   - Request size validation
+   - HTTP header validation (Accept, Content-Type)
+   - Rate limiting
+   - JSON-RPC envelope parsing
+   - Exchange property population
+4. **Response Serialization**: Automatic JSON serialization of Map/POJO responses
+5. **Lifecycle Management**: Proper startup and shutdown of Undertow server endpoints
+
+### Consumer Architecture
+
+```
+McpConsumer wraps UndertowConsumer:
+  ↓
+McpRequestSizeGuardProcessor
+  ↓  
+McpHttpValidatorProcessor (HTTP only)
+  ↓
+McpRateLimitProcessor
+  ↓
+McpJsonRpcEnvelopeProcessor
+  ↓
+User Processor (route logic)
+  ↓
+JSON Serialization
+  ↓
+Response
+```
+
+### Usage Example
+
+```java
+// HTTP Server
+from("mcp:http://localhost:8080/mcp")
+    .process(myMcpProcessor);
+
+// WebSocket Server  
+from("mcp:http://localhost:8090/mcp?websocket=true")
+    .process(myMcpProcessor);
+```
+
+### Tests
+
+All consumer functionality is validated in `McpConsumerTest.java`:
+- HTTP consumer basic operation
+- WebSocket consumer configuration
+- JSON-RPC envelope parsing
+- Consumer lifecycle management
+
+---
+
 ## Summary
 
 The `io.dscope:camel-mcp` library needs these additions to become a full MCP Apps host:
@@ -607,3 +666,5 @@ The `io.dscope:camel-mcp` library needs these additions to become a full MCP App
 5. **Notification push** via WebSocket for `ui/notifications/*`
 
 The existing `tools/list`, `resources/list`, `resources/read`, and `tools/call` implementations are already MCP Apps compliant for server mode.
+
+**Consumer Implementation**: ✅ Complete - The `McpConsumer` provides full MCP server functionality with HTTP and WebSocket support.

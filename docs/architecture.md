@@ -1,8 +1,77 @@
 # 🧠 Architecture
 
-Component → Endpoint → Producer/Consumer.
+## Component Model
 
-The `McpJsonRpcEnvelopeProcessor` normalizes incoming JSON-RPC envelopes and stores metadata (method, id, notification type) on the exchange. From there, Camel choice blocks route to feature-specific processors.
+The MCP component follows the standard Camel pattern:
+
+**Component → Endpoint → Producer/Consumer**
+
+- **McpComponent**: Creates endpoints from URIs (`mcp:http://...`)
+- **McpEndpoint**: Holds configuration and creates producers or consumers
+- **McpProducer**: Sends MCP requests to remote servers (client mode)
+- **McpConsumer**: Receives MCP requests from clients (server mode)
+
+## Consumer Architecture (Server Mode)
+
+The `McpConsumer` creates a server endpoint that listens for incoming MCP requests:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     MCP Consumer Flow                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  HTTP/WebSocket Request                                     │
+│         ↓                                                    │
+│  ┌──────────────────────────────┐                          │
+│  │  Undertow Server             │                          │
+│  │  (HTTP or WebSocket)         │                          │
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  ┌──────────────────────────────┐                          │
+│  │  McpRequestSizeGuardProcessor│  Validate request size   │
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  ┌──────────────────────────────┐                          │
+│  │  McpHttpValidatorProcessor   │  Check headers (HTTP)    │
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  ┌──────────────────────────────┐                          │
+│  │  McpRateLimitProcessor       │  Apply rate limits       │
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  ┌──────────────────────────────┐                          │
+│  │  McpJsonRpcEnvelopeProcessor │  Parse JSON-RPC          │
+│  │                               │  Extract method/params   │
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  ┌──────────────────────────────┐                          │
+│  │  User Processor              │  Custom business logic   │
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  ┌──────────────────────────────┐                          │
+│  │  JSON Serialization          │  Convert response to JSON│
+│  └──────────────┬───────────────┘                          │
+│                 ↓                                           │
+│  HTTP/WebSocket Response                                   │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Exchange Properties Set by Consumer
+
+The `McpJsonRpcEnvelopeProcessor` normalizes incoming JSON-RPC envelopes and stores metadata on the exchange:
+
+- `mcp.jsonrpc.type`: REQUEST, NOTIFICATION, or RESPONSE
+- `mcp.jsonrpc.id`: Request ID (for responses)
+- `mcp.jsonrpc.method`: MCP method name (e.g., "tools/list")
+- `mcp.tool.name`: Tool name (for tools/call requests)
+- `mcp.notification.type`: Notification type (for notifications)
+
+User processors can access these properties to implement method-specific logic.
+
+## Producer Architecture (Client Mode)
+
+The `McpProducer` sends requests to remote MCP servers. The exchange body should contain a Map with the request parameters.
 
 ## Supported MCP Methods
 

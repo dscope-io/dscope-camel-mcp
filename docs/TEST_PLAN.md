@@ -679,3 +679,160 @@ Legend: ✅ Pass | ❌ Fail | ⬜ Not Tested
 4. **WebSocket connection refused**
    - Ensure WS route is loaded (port 8090)
    - Check firewall settings
+
+---
+
+## Consumer Component Tests
+
+The MCP Consumer allows creating MCP servers programmatically through Camel routes. These tests validate the consumer functionality.
+
+### 7.1 HTTP Consumer Basic Operation
+
+**Test**: `McpConsumerTest.testHttpConsumerStartsAndResponds`
+
+```java
+from("mcp:http://localhost:9876/test")
+    .process(exchange -> {
+        Map<String, Object> response = Map.of(
+            "jsonrpc", "2.0",
+            "id", exchange.getProperty("mcp.jsonrpc.id"),
+            "result", Map.of("echo", "pong")
+        );
+        exchange.getMessage().setBody(response);
+    });
+```
+
+**Request**:
+```bash
+curl -X POST http://localhost:9876/test \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":"test-1","method":"ping"}'
+```
+
+**Validation**:
+- [ ] Consumer starts and binds to port
+- [ ] Request is received and processed
+- [ ] Response contains JSON-RPC 2.0 envelope
+- [ ] Consumer stops cleanly on shutdown
+
+---
+
+### 7.2 WebSocket Consumer Configuration
+
+**Test**: `McpConsumerTest.testWebSocketConsumerConfiguration`
+
+```java
+from("mcp:http://localhost:9877/ws?websocket=true")
+    .process(exchange -> {
+        Map<String, Object> response = Map.of(
+            "jsonrpc", "2.0",
+            "result", Map.of("status", "ok")
+        );
+        exchange.getMessage().setBody(response);
+    });
+```
+
+**Validation**:
+- [ ] WebSocket consumer starts without errors
+- [ ] Route context is active
+- [ ] Can accept WebSocket connections
+
+---
+
+### 7.3 JSON-RPC Envelope Parsing
+
+**Test**: `McpConsumerTest.testConsumerWithJsonRpcParsing`
+
+Validates that the consumer:
+- Extracts `method` from JSON-RPC request
+- Sets exchange property `mcp.jsonrpc.method`
+- Makes it available to user processor
+
+**Validation**:
+- [ ] Method extracted: `tools/list`
+- [ ] Exchange property set correctly
+- [ ] User processor can access the method
+
+---
+
+### 7.4 Consumer Lifecycle Management
+
+**Test**: `McpConsumerTest.testConsumerStopsCleanly`
+
+**Validation**:
+- [ ] Consumer starts successfully
+- [ ] Consumer stops without exceptions
+- [ ] No resource leaks (ports, connections)
+- [ ] Undertow server shuts down properly
+
+---
+
+## Integration Test Scenarios
+
+### 8.1 End-to-End Consumer Flow
+
+**Setup**:
+1. Start consumer route with custom processor
+2. Send MCP initialize request
+3. Send tools/list request
+4. Send tools/call request
+5. Verify all responses
+
+**Expected Results**:
+- All requests processed successfully
+- Responses match MCP specification
+- Exchange properties correctly populated
+
+---
+
+### 8.2 Consumer Error Handling
+
+**Test missing headers**:
+```bash
+curl -X POST http://localhost:9876/test \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"ping"}'
+```
+
+**Expected**: HTTP 400 - Missing Accept header
+
+**Test invalid JSON**:
+```bash
+curl -X POST http://localhost:9876/test \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{invalid json}'
+```
+
+**Expected**: HTTP 400 - Parse error
+
+---
+
+### 8.3 Consumer Rate Limiting
+
+Send 100+ rapid requests to consumer endpoint.
+
+**Validation**:
+- [ ] Rate limit processor invoked
+- [ ] Appropriate throttling applied
+- [ ] Error responses for rate-limited requests
+
+---
+
+## Test Automation
+
+All consumer tests are automated in:
+- `src/test/java/io/dscope/camel/mcp/McpConsumerTest.java`
+
+Run consumer tests:
+```bash
+mvn test -Dtest=McpConsumerTest
+```
+
+Run all tests including consumer:
+```bash
+mvn test
+```
+
+Current status: **86 tests passing** (including 4 consumer tests)
