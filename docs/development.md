@@ -4,6 +4,19 @@ This guide explains how to build MCP services using the Camel MCP component. You
 
 ## Project Setup
 
+### Use from Maven Central
+
+Artifact coordinates:
+
+- `io.dscope.camel:camel-mcp:1.3.0`
+
+Maven Central links:
+
+- https://central.sonatype.com/artifact/io.dscope.camel/camel-mcp
+- https://repo1.maven.org/maven2/io/dscope/camel/camel-mcp/
+
+For Maven and Gradle builds, `mavenCentral()` is enough; no extra repository configuration is required.
+
 ### Maven Dependencies
 
 ```xml

@@ -9,6 +9,10 @@
 | Latest Release | 1.3.0 | `io.dscope.camel:camel-mcp:1.3.0` | Recommended for production use |
 | Development Snapshot | 1.3.0 | `io.dscope.camel:camel-mcp:1.3.0` | Build from source (`mvn install`) to track `main` |
 
+Maven Central:
+- https://central.sonatype.com/artifact/io.dscope.camel/camel-mcp
+- https://repo1.maven.org/maven2/io/dscope/camel/camel-mcp/
+
 ## 📋 Requirements
 
 - Java 21+
@@ -40,6 +44,14 @@
   <artifactId>camel-mcp</artifactId>
   <version>1.3.0</version>
 </dependency>
+```
+
+### Gradle Dependency (Release)
+
+```groovy
+dependencies {
+  implementation "io.dscope.camel:camel-mcp:1.3.0"
+}
 ```
 
 ### Build From Source (Snapshot)
