@@ -725,3 +725,13 @@ mvn -Pkaravan-metadata compile exec:java
 This runs `McpKaravanMetadataGenerator` which produces files under `src/main/resources/karavan/metadata/`. Regenerate after adding new MCP methods or changing component properties.
 
 The generator is located at `src/main/java/io/dscope/tools/karavan/McpKaravanMetadataGenerator.java`.
+
+## Repository Metadata Sync Checklist
+
+When preparing a release (or any public update), keep GitHub repository metadata and docs aligned:
+
+- **GitHub Description** - Matches the short project summary used in `README.md`.
+- **GitHub Topics** - Reflect current scope (Camel, MCP, JSON-RPC, Java, AI integration).
+- **GitHub Homepage** - Points to `https://github.com/dscope-io/dscope-camel-mcp#readme`.
+- **README metadata block** - Keep `Project Home` and `Repository Metadata` values in sync with GitHub settings.
+- **Version references** - Update release version in README dependency snippets if needed.

@@ -2,6 +2,15 @@
 
 > Apache Camel 4 extension that speaks the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) over JSON-RPC so agents and automations can call your Camel routes as tools.
 
+Project Home: https://github.com/dscope-io/dscope-camel-mcp#readme
+
+## 🏷 Repository Metadata
+
+- **Description:** Apache Camel MCP component enabling Model Context Protocol client/server routes over HTTP/WebSocket.
+- **Topics:** `ai-integration`, `apache-camel`, `camel-component`, `java`, `json-rpc`, `mcp`, `model-context-protocol`
+
+_Note: These values mirror the GitHub repository settings (Description, Topics, Homepage). Keep both in sync when updating project metadata._
+
 ## 📦 Versions
 
 | Channel | Version | Maven Coordinate | Notes |
