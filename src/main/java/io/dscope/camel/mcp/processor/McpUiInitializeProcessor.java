@@ -25,7 +25,7 @@ public class McpUiInitializeProcessor extends AbstractMcpResponseProcessor {
     public static final String EXCHANGE_PROPERTY_UI_SESSION_ID = "mcp.ui.sessionId";
 
     private static final String DEFAULT_HOST_NAME = "camel-mcp";
-    private static final String DEFAULT_HOST_VERSION = "1.3.0";
+    private static final String DEFAULT_HOST_VERSION = "1.4.0";
 
     private static final List<String> CAPABILITIES = List.of(
             "tools/call",

@@ -35,6 +35,24 @@ This starts:
 * REST: `http://localhost:8080/mcp`
 * WebSocket: `ws://localhost:8090/mcp`
 
+It also runs one-shot producer demos after startup:
+
+* Remote dispatch: `mcp:http://localhost:8080/mcp?method=initialize`
+* Local dispatch: `mcp:camel:direct:local-mcp-service?method=ping`
+
+Check logs for:
+
+```text
+MCP producer remote dispatch result: {...}
+MCP producer local dispatch result: {...}
+```
+
+To disable these demo timers (for cleaner startup logs), run:
+
+```bash
+mvn -f samples/mcp-service/pom.xml exec:java -Dmcp.producer.demo.enabled=false
+```
+
 You can change ports/paths by editing the query parameters on the Kamelet URIs inside `routes/mcp-service-kamelet.camel.yaml` (`restPort`, `wsPort`, `restContextPath`, `wsPath`).
 
 ## OpenAPI descriptor

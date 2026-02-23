@@ -59,7 +59,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
     "protocolVersion": "2025-06-18",
     "serverInfo": {
       "name": "camel-mcp",
-      "version": "1.3.0"
+      "version": "1.4.0"
     },
     "capabilities": {
       "tools": { "listChanged": true },
@@ -288,7 +288,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
     "sessionId": "<UUID>",
     "hostInfo": {
       "name": "camel-mcp-host",
-      "version": "1.3.0"
+      "version": "1.4.0"
     },
     "capabilities": {
       "tools/call": true,
@@ -554,7 +554,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
 {
   "status": "UP",
   "timestamp": "...",
-  "version": "1.3.0"
+  "version": "1.4.0"
 }
 ```
 
@@ -648,7 +648,7 @@ Legend: ✅ Pass | ❌ Fail | ⬜ Not Tested
 
 ## Changelog
 
-### v1.3.0 (2025-01-xx)
+### v1.4.0 (2025-01-xx)
 - **Bug Fix**: Fixed `ui/tools/call` returning empty text response
   - **Root Cause**: `McpJsonRpcEnvelopeProcessor.handleUiToolsCall()` was setting property `"mcp.uiSessionId"` but processors looked for `"mcp.ui.sessionId"` (via `EXCHANGE_PROPERTY_UI_SESSION_ID` constant)
   - **Solution**: Updated to use the constant `McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID` consistently
@@ -856,7 +856,7 @@ curl -s -X POST http://localhost:3000/mcp \
   "id": "1",
   "result": {
     "protocolVersion": "2025-06-18",
-    "serverInfo": { "name": "mcp-consumer-sample", "version": "1.3.0" },
+    "serverInfo": { "name": "mcp-consumer-sample", "version": "1.4.0" },
     "capabilities": { "tools/list": true, "tools/call": true, "ping": true, "resources/list": true }
   }
 }

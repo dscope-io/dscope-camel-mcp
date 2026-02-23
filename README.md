@@ -15,8 +15,8 @@ _Note: These values mirror the GitHub repository settings (Description, Topics, 
 
 | Channel | Version | Maven Coordinate | Notes |
 | --- | --- | --- | --- |
-| Latest Release | 1.3.0 | `io.dscope.camel:camel-mcp:1.3.0` | Recommended for production use |
-| Development Snapshot | 1.3.0 | `io.dscope.camel:camel-mcp:1.3.0` | Build from source (`mvn install`) to track `main` |
+| Latest Release | 1.4.0 | `io.dscope.camel:camel-mcp:1.4.0` | Recommended for production use |
+| Development Snapshot | 1.4.0 | `io.dscope.camel:camel-mcp:1.4.0` | Build from source (`mvn install`) to track `main` |
 
 Maven Central:
 - https://central.sonatype.com/artifact/io.dscope.camel/camel-mcp
@@ -51,7 +51,7 @@ Maven Central:
 <dependency>
   <groupId>io.dscope.camel</groupId>
   <artifactId>camel-mcp</artifactId>
-  <version>1.3.0</version>
+  <version>1.4.0</version>
 </dependency>
 ```
 
@@ -59,7 +59,7 @@ Maven Central:
 
 ```groovy
 dependencies {
-  implementation "io.dscope.camel:camel-mcp:1.3.0"
+  implementation "io.dscope.camel:camel-mcp:1.4.0"
 }
 ```
 
@@ -78,6 +78,7 @@ mvn clean install
 **Producer (Client) Mode:**
 ```
 mcp:http://host:port/mcp?method=tools/list
+mcp:camel:direct:localMcpRoute?method=tools/list
 ```
 
 **Consumer (Server) Mode:**
@@ -99,6 +100,108 @@ mcp:http://host:port/path?websocket=true
 ### Producer Mode
 
 The exchange body should be a `Map` representing MCP `params`. The producer enriches it with `jsonrpc`, `id`, and the configured `method` before invoking the downstream HTTP endpoint.
+
+You can override the endpoint `method` per message with header `CamelMcpMethod`.
+
+For local MCP services exposed as Camel routes, use the URI prefix `camel:` after `mcp:`.
+Dispatch is selected by endpoint URI structure:
+- `mcp:camel:<camel-endpoint-uri>` -> local Camel route dispatch (in-process)
+- `mcp:http://...` / `mcp:https://...` -> remote JSON transport dispatch
+
+Example local dispatch from Java routes:
+
+```java
+from("direct:start")
+  .setBody(constant(Map.of("clientInfo", Map.of("name", "local-client", "version", "1.0.0"))))
+  .to("mcp:camel:direct:localMcpService?method=initialize")
+  .log("${body}");
+```
+
+#### Remote vs Local Producer (YAML)
+
+Remote MCP producer route:
+
+```yaml
+- route:
+    id: remote-mcp-client
+    from:
+      uri: "direct:remoteMcp"
+      steps:
+        - setBody:
+            constant:
+              clientInfo:
+                name: "camel-client"
+                version: "1.0.0"
+        - to:
+            uri: "mcp:http://localhost:8080/mcp?method=initialize"
+        - setBody:
+            simple: "${body[result]}"
+```
+
+Local MCP producer route + local service route:
+
+```yaml
+- route:
+    id: local-mcp-client
+    from:
+      uri: "direct:localMcpClient"
+      steps:
+        - setBody:
+            constant:
+              probe: true
+        - to:
+            uri: "mcp:camel:direct:localMcpService?method=ping"
+        - setBody:
+            simple: "${body[result]}"
+
+- route:
+    id: local-mcp-service
+    from:
+      uri: "direct:localMcpService"
+      steps:
+        - setBody:
+            simple: |
+              {
+                "jsonrpc": "2.0",
+                "id": "${body[id]}",
+                "result": {
+                  "method": "${body[method]}",
+                  "pong": true,
+                  "local": true
+                }
+              }
+        - unmarshal:
+            json:
+              library: Jackson
+```
+
+#### Java Helper API
+
+Use `io.dscope.camel.mcp.McpClient` for Java-friendly calls that return MCP `result` payloads directly:
+
+```java
+ProducerTemplate template = camelContext.createProducerTemplate();
+String endpoint = "mcp:http://localhost:8080/mcp?method=initialize";
+
+Object pingResult = McpClient.pingResult(template, endpoint);
+Object toolsResult = McpClient.toolsListResult(template, endpoint);
+JsonNode pingJson = McpClient.pingResultJson(template, endpoint);
+JsonNode toolsJson = McpClient.toolsListResultJson(template, endpoint);
+
+Object initializeResult = McpClient.callResult(
+  template,
+  endpoint,
+  "initialize",
+  Map.of("clientInfo", Map.of("name", "java-client", "version", "1.0.0"))
+);
+
+JsonNode initializeJson = McpClient.callResultJson(
+  template,
+  endpoint,
+  "initialize",
+  Map.of("clientInfo", Map.of("name", "java-client", "version", "1.0.0"))
+);
+```
 
 ### Consumer Mode
 
@@ -335,7 +438,7 @@ Response includes a `sessionId` for subsequent UI calls:
 {
   "result": {
     "sessionId": "abc123-...",
-    "hostInfo": {"name": "camel-mcp", "version": "1.3.0"},
+    "hostInfo": {"name": "camel-mcp", "version": "1.4.0"},
     "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
   }
 }

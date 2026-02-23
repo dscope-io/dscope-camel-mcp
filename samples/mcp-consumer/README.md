@@ -15,6 +15,8 @@ with a plain Java processor to dispatch MCP methods.
 | MCP methods | `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list` |
 | Tools | `echo`, `add`, `greet` |
 | Notifications | Accepted with 204 (no-op) |
+| Producer demo (remote) | `mcp:http://localhost:3000/mcp?method=initialize` |
+| Producer demo (local) | `mcp:camel:direct:local-mcp-service?method=ping` |
 
 ## Prerequisites
 
@@ -30,6 +32,24 @@ mvn clean install -DskipTests
 ```bash
 cd samples/mcp-consumer
 mvn compile exec:java
+```
+
+On startup, two one-shot producer demo routes run automatically and log results:
+
+- Remote dispatch to the HTTP MCP endpoint (`mcp:http://...`)
+- Local in-process dispatch to a Camel route (`mcp:camel:direct:...`)
+
+Look for log lines similar to:
+
+```text
+MCP producer remote dispatch result: {...}
+MCP producer local dispatch result: {...}
+```
+
+To disable these demo timers (for cleaner startup logs), run:
+
+```bash
+mvn compile exec:java -Dmcp.producer.demo.enabled=false
 ```
 
 ## Quick test

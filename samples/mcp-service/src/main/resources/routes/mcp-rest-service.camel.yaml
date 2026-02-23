@@ -149,3 +149,53 @@
       steps:
         - process:
             ref: mcpHealthStatus
+
+- route:
+    id: mcp-local-service
+    from:
+      uri: direct:local-mcp-service
+      steps:
+        - setBody:
+            simple: |
+              {
+                "jsonrpc": "2.0",
+                "id": "${body.id}",
+                "result": {
+                  "method": "${body.method}",
+                  "local": true,
+                  "pong": true
+                }
+              }
+        - unmarshal:
+            json:
+              library: Jackson
+
+- route:
+    id: mcp-producer-remote-demo
+    autoStartup: "{{mcp.producer.demo.enabled:true}}"
+    from:
+      uri: timer:mcpProducerRemote?repeatCount=1&delay=4000
+      steps:
+        - setBody:
+            constant:
+              clientInfo:
+                name: mcp-service-remote-demo
+                version: "1.0.0"
+        - to:
+            uri: mcp:http://localhost:8080/mcp?method=initialize
+        - log:
+            message: "MCP producer remote dispatch result: ${body.result}"
+
+- route:
+    id: mcp-producer-local-demo
+    autoStartup: "{{mcp.producer.demo.enabled:true}}"
+    from:
+      uri: timer:mcpProducerLocal?repeatCount=1&delay=4000
+      steps:
+        - setBody:
+            constant:
+              probe: true
+        - to:
+            uri: mcp:camel:direct:local-mcp-service?method=ping
+        - log:
+            message: "MCP producer local dispatch result: ${body.result}"

@@ -62,7 +62,7 @@ class McpUiInitializeProcessorTest {
             Map<String, Object> hostInfo = (Map<String, Object>) result.get("hostInfo");
             assertNotNull(hostInfo);
             assertEquals("camel-mcp", hostInfo.get("name"));
-            assertEquals("1.3.0", hostInfo.get("version"));
+            assertEquals("1.4.0", hostInfo.get("version"));
             
             // Verify capabilities are returned
             assertNotNull(result.get("capabilities"));

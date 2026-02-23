@@ -1,6 +1,5 @@
 package io.dscope.camel.mcp;
 
-import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.apache.camel.component.undertow.UndertowConsumer;
 import org.apache.camel.component.undertow.UndertowEndpoint;
@@ -16,10 +15,11 @@ import io.dscope.camel.mcp.processor.McpRateLimitProcessor;
 import io.dscope.camel.mcp.processor.McpHttpValidatorProcessor;
 
 /**
- * MCP Consumer that sets up HTTP or WebSocket server endpoints to receive MCP JSON-RPC requests.
+ * Camel consumer-side implementation for MCP server calls.
  * <p>
- * The consumer wraps an Undertow consumer to listen for incoming MCP requests,
- * processes them through the JSON-RPC envelope parser, and delegates to the configured processor.
+ * It creates an Undertow HTTP/WebSocket listener, applies MCP pre-processing
+ * (size guard, HTTP validation, rate limiting, JSON-RPC envelope parsing),
+ * delegates to the route processor, and normalizes JSON responses.
  */
 public class McpConsumer extends DefaultConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(McpConsumer.class);
@@ -54,30 +54,31 @@ public class McpConsumer extends DefaultConsumer {
         
         LOG.info("Creating MCP server with Undertow URI: {}", undertowUri);
         
-        // Create an Undertow endpoint using the CamelContext
-        // The URI must include the "undertow:" prefix for the component
+        // Create an Undertow endpoint from the normalized URI.
         String fullUndertowUri = "undertow:" + undertowUri;
         LOG.info("Full Undertow URI with component prefix: {}", fullUndertowUri);
         
         UndertowEndpoint undertowEndpoint = (UndertowEndpoint) endpoint.getCamelContext().getEndpoint(fullUndertowUri);
         
-        // Create a processor chain that includes MCP processing before calling user processor
+        // Build processor chain: MCP guards/parsing -> user processor -> response normalization.
         Processor mcpProcessor = exchange -> {
             try {
-                // Apply MCP processors in sequence
+                // 1) Validate request size first to protect resources.
                 requestSizeGuard.process(exchange);
                 
+                // 2) Validate HTTP headers for HTTP transport only.
                 if (!config.isWebsocket()) {
                     httpValidator.process(exchange);
                 }
                 
+                // 3) Apply rate limiting and parse JSON-RPC envelope metadata.
                 rateLimit.process(exchange);
                 jsonRpcEnvelope.process(exchange);
                 
-                // Call the user's processor
+                // 4) Delegate business handling to the route processor.
                 getProcessor().process(exchange);
                 
-                // Serialize response to JSON if it's a Map or POJO
+                // 5) Serialize non-string response payloads to JSON.
                 Object body = exchange.getMessage().getBody();
                 if (body != null && !(body instanceof String) && !(body instanceof byte[])) {
                     try {
@@ -95,7 +96,7 @@ public class McpConsumer extends DefaultConsumer {
                     }
                 }
                 
-                // Ensure response has JSON content type
+                // 6) Ensure JSON content type is present when not explicitly set.
                 if (exchange.getMessage().getHeader("Content-Type") == null) {
                     exchange.getMessage().setHeader("Content-Type", "application/json");
                 }
@@ -105,7 +106,7 @@ public class McpConsumer extends DefaultConsumer {
             }
         };
         
-        // Create and start the Undertow consumer with our processor chain
+        // Start Undertow consumer with the composed MCP processing pipeline.
         undertowConsumer = (UndertowConsumer) undertowEndpoint.createConsumer(mcpProcessor);
         undertowConsumer.start();
         
@@ -116,6 +117,7 @@ public class McpConsumer extends DefaultConsumer {
     protected void doStop() throws Exception {
         LOG.info("Stopping MCP consumer for endpoint: {}", endpoint.getEndpointUri());
         
+        // Stop transport listener first, then invoke parent lifecycle stop.
         if (undertowConsumer != null) {
             try {
                 undertowConsumer.stop();

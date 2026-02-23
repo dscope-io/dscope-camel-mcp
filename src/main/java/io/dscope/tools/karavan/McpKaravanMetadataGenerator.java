@@ -109,7 +109,7 @@ public class McpKaravanMetadataGenerator {
         comp.put("firstVersion", "1.0.0");
         comp.put("groupId", "io.dscope.camel");
         comp.put("artifactId", "camel-mcp");
-        comp.put("version", "1.3.0");
+        comp.put("version", "1.4.0");
         comp.put("producerOnly", false);
         comp.put("consumerOnly", false);
         comp.put("lenientProperties", true);

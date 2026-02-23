@@ -92,7 +92,7 @@ Response:
     "protocolVersion": "2024-11-05",
     "serverInfo": {
       "name": "camel-mcp-server",
-      "version": "1.3.0"
+      "version": "1.4.0"
     },
     "capabilities": {
       "tools": { "listChanged": true },
@@ -270,7 +270,7 @@ Response:
   "id": "ui-1",
   "result": {
     "sessionId": "abc123-uuid-...",
-    "hostInfo": {"name": "camel-mcp", "version": "1.3.0"},
+    "hostInfo": {"name": "camel-mcp", "version": "1.4.0"},
     "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
   }
 }
@@ -333,7 +333,7 @@ Once connected, send JSON-RPC messages (lines starting with `>` are sent, `<` ar
 ```
 # Initialize session (required first)
 > {"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"ws-client","version":"1.0.0"}}}
-< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.3.0"}}}
+< {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"camel-mcp-server","version":"1.4.0"}}}
 
 # Ping (health check)
 > {"jsonrpc":"2.0","id":"2","method":"ping"}

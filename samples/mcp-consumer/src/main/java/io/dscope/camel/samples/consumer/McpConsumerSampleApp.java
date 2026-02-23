@@ -10,6 +10,9 @@ import org.apache.camel.main.Main;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.dscope.camel.mcp.model.McpRequest;
+import io.dscope.camel.mcp.model.McpResponse;
+
 /**
  * Demonstrates the MCP Consumer component — a fully functional MCP server
  * built with a single {@code from("mcp:...")} route.
@@ -62,6 +65,27 @@ public class McpConsumerSampleApp {
                 from("mcp:http://0.0.0.0:3001/mcp?websocket=true")
                     .routeId("mcp-consumer-ws")
                     .process(McpConsumerSampleApp::dispatch);
+
+                // Local in-process MCP service endpoint for producer local dispatch demo
+                from("direct:local-mcp-service")
+                    .routeId("mcp-local-service")
+                    .process(McpConsumerSampleApp::handleLocalServiceRequest);
+
+                // Producer demo: remote dispatch to the HTTP MCP endpoint
+                from("timer:mcp-producer-remote?repeatCount=1&delay=3000")
+                    .routeId("mcp-producer-remote-demo")
+                    .autoStartup("{{mcp.producer.demo.enabled:true}}")
+                    .setBody(constant(Map.of("clientInfo", Map.of("name", "remote-demo", "version", "1.0.0"))))
+                    .to("mcp:http://localhost:3000/mcp?method=initialize")
+                    .process(exchange -> logProducerResult(exchange, "remote"));
+
+                // Producer demo: local in-process dispatch via URI structure mcp:camel:...
+                from("timer:mcp-producer-local?repeatCount=1&delay=3000")
+                    .routeId("mcp-producer-local-demo")
+                    .autoStartup("{{mcp.producer.demo.enabled:true}}")
+                    .setBody(constant(Map.of("probe", true)))
+                    .to("mcp:camel:direct:local-mcp-service?method=ping")
+                    .process(exchange -> logProducerResult(exchange, "local"));
             }
         });
 
@@ -107,7 +131,7 @@ public class McpConsumerSampleApp {
             "protocolVersion", "2025-06-18",
             "serverInfo", Map.of(
                 "name", "mcp-consumer-sample",
-                "version", "1.3.0"
+                "version", "1.4.0"
             ),
             "capabilities", Map.of(
                 "tools/list", true,
@@ -213,6 +237,26 @@ public class McpConsumerSampleApp {
         exchange.getIn().setHeader(Exchange.HTTP_RESPONSE_CODE, 204);
         exchange.getIn().setBody(null);
         LOG.info("Received notification: {}", method);
+    }
+
+    private static void handleLocalServiceRequest(Exchange exchange) {
+        McpRequest request = exchange.getIn().getBody(McpRequest.class);
+
+        McpResponse response = new McpResponse();
+        response.setJsonrpc("2.0");
+        response.setId(request != null ? request.getId() : null);
+        response.setResult(Map.of(
+                "method", request != null ? request.getMethod() : "unknown",
+                "local", true,
+                "pong", true
+        ));
+        exchange.getIn().setBody(response);
+    }
+
+    private static void logProducerResult(Exchange exchange, String mode) {
+        McpResponse response = exchange.getIn().getBody(McpResponse.class);
+        Object result = response != null ? response.getResult() : null;
+        LOG.info("MCP producer {} dispatch result: {}", mode, result);
     }
 
     // ---- helpers ----

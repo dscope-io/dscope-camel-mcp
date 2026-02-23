@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.dscope.camel.samples</groupId>
     <artifactId>mcp-consumer-sample</artifactId>
-    <version>1.3.0</version>
+    <version>1.4.0</version>
     <name>Camel MCP Consumer Sample</name>
     <description>
         Demonstrates the MCP Consumer component — build an MCP-compliant server
@@ -23,7 +23,7 @@
         <dependency>
             <groupId>io.dscope.camel</groupId>
             <artifactId>camel-mcp</artifactId>
-            <version>1.3.0</version>
+            <version>1.4.0</version>
         </dependency>
 
         <!-- Camel core -->

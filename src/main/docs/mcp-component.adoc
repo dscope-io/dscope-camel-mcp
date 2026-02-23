@@ -37,7 +37,7 @@ include::partial$component-endpoint-options.adoc[]
 
 == Producer
 
-The producer sends MCP JSON-RPC 2.0 requests to a remote MCP server. Supported methods include:
+The producer sends MCP JSON-RPC 2.0 requests to remote MCP servers or local Camel routes. Supported methods include:
 
 * `initialize` – Initialize an MCP session
 * `ping` – Health check ping
@@ -45,6 +45,19 @@ The producer sends MCP JSON-RPC 2.0 requests to a remote MCP server. Supported m
 * `tools/call` – Invoke a specific tool
 * `resources/list` – List available resources
 * `resources/read` – Read a specific resource
+
+Producer dispatch is selected by endpoint URI structure:
+
+* `mcp:camel:<camel-endpoint-uri>` – local in-process Camel route dispatch
+* `mcp:http://...` / `mcp:https://...` – remote JSON transport dispatch
+
+Use the URI prefix `camel:` after `mcp:` to target local in-process routes.
+
+Per-message method override is supported via header `CamelMcpMethod`.
+
+For Java callers, `io.dscope.camel.mcp.McpClient` provides helper methods such as
+`pingResult(...)`, `toolsListResult(...)`, `pingResultJson(...)`, and `toolsListResultJson(...)`
+to return MCP `result` payloads as either raw objects or `JsonNode`.
 
 == Consumer
 
@@ -72,6 +85,76 @@ The consumer sets the following exchange properties:
           json: {}
       - to: "mcp:http://localhost:8080/mcp?method=tools/call"
       - log: "${body}"
+----
+
+=== Producer – Local Camel MCP Service
+
+[source,java]
+----
+from("direct:start")
+    .setBody(constant(Map.of("clientInfo", Map.of("name", "local-client", "version", "1.0.0"))))
+    .to("mcp:camel:direct:localMcpService?method=initialize")
+    .log("${body}");
+----
+
+=== Producer – Remote vs Local (YAML)
+
+Remote MCP producer route:
+
+[source,yaml]
+----
+- route:
+        id: remote-mcp-client
+        from:
+            uri: "direct:remoteMcp"
+            steps:
+                - setBody:
+                        constant:
+                            clientInfo:
+                                name: "camel-client"
+                                version: "1.0.0"
+                - to:
+                        uri: "mcp:http://localhost:8080/mcp?method=initialize"
+                - setBody:
+                        simple: "${body[result]}"
+----
+
+Local MCP producer route + local service route:
+
+[source,yaml]
+----
+- route:
+        id: local-mcp-client
+        from:
+            uri: "direct:localMcpClient"
+            steps:
+                - setBody:
+                        constant:
+                            probe: true
+                - to:
+                        uri: "mcp:camel:direct:localMcpService?method=ping"
+                - setBody:
+                        simple: "${body[result]}"
+
+- route:
+        id: local-mcp-service
+        from:
+            uri: "direct:localMcpService"
+            steps:
+                - setBody:
+                        simple: |
+                            {
+                                "jsonrpc": "2.0",
+                                "id": "${body[id]}",
+                                "result": {
+                                    "method": "${body[method]}",
+                                    "pong": true,
+                                    "local": true
+                                }
+                            }
+                - unmarshal:
+                        json:
+                            library: Jackson
 ----
 
 === Consumer – Expose an MCP Server
