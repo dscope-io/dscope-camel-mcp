@@ -6,6 +6,8 @@ import java.util.Map;
 import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +17,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 @BindToRegistry("mcpHealthStatus")
 public class McpHealthStatusProcessor implements Processor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpHealthStatusProcessor.class);
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -44,7 +48,11 @@ public class McpHealthStatusProcessor implements Processor {
             String json = OBJECT_MAPPER.writeValueAsString(body);
             exchange.getIn().setBody(json);
         } catch (JsonProcessingException e) {
+            LOG.error("Failed to serialize MCP health status payload keys={}", body.keySet(), e);
             exchange.getIn().setBody("{\"status\":\"DEGRADED\"}");
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Returning DEGRADED fallback health payload");
+            }
         }
         exchange.getIn().setHeader(Exchange.CONTENT_TYPE, "application/json");
     }

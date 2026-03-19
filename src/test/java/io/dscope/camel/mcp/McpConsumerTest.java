@@ -2,7 +2,6 @@ package io.dscope.camel.mcp;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
-import org.apache.camel.Processor;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.impl.DefaultCamelContext;
@@ -156,6 +155,43 @@ class McpConsumerTest {
         );
 
         assertEquals("tools/list", capturedMethod[0]);
+    }
+
+    @Test
+    void testInvalidHttpHeadersReturnJsonRpcError() throws Exception {
+        context.addRoutes(new RouteBuilder() {
+            @Override
+            public void configure() {
+                from("mcp:http://localhost:9880/mcp")
+                    .process(exchange -> exchange.getMessage().setBody(Map.of("ok", Boolean.TRUE)));
+            }
+        });
+
+        context.start();
+        TimeUnit.MILLISECONDS.sleep(500);
+
+        String request = """
+            {
+                "jsonrpc": "2.0",
+                "id": "bad-headers",
+                "method": "initialize",
+                "params": {}
+            }
+            """;
+
+        Exchange exchange = template.request("http://localhost:9880/mcp?throwExceptionOnFailure=false", incoming -> {
+            incoming.getMessage().setBody(request);
+            incoming.getMessage().setHeader("Content-Type", "application/json");
+        });
+
+        String response = exchange.getMessage().getBody(String.class);
+        Integer statusCode = exchange.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class);
+
+        assertEquals(400, statusCode);
+        assertNotNull(response);
+        assertTrue(response.contains("\"jsonrpc\":\"2.0\""), response);
+        assertTrue(response.contains("\"error\""), response);
+        assertTrue(response.contains("Accept header must include application/json and text/event-stream"), response);
     }
 
     @Test

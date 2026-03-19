@@ -21,3 +21,5 @@ docs/PUBLISH_GUIDE.md
 .vscode
 .DS_Store
 docs/PUBLISH_GUIDE.md
+samples/mcp-consumer/.LCKpom.xml~
+.gitignore

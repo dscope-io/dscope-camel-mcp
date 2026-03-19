@@ -131,7 +131,7 @@ public class McpConsumerSampleApp {
             "protocolVersion", "2025-06-18",
             "serverInfo", Map.of(
                 "name", "mcp-consumer-sample",
-                "version", "1.4.0"
+                "version", "1.4.1"
             ),
             "capabilities", Map.of(
                 "tools/list", true,

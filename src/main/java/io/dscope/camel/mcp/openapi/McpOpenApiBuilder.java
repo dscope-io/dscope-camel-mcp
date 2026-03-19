@@ -8,10 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Builds a static OpenAPI definition describing the MCP HTTP endpoints exposed by the component samples.
  */
 public class McpOpenApiBuilder {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpOpenApiBuilder.class);
 
     private String title = "Camel MCP Service";
     private String version = "1.0.0";
@@ -74,9 +79,19 @@ public class McpOpenApiBuilder {
     public void writeYaml(Path outputPath) {
         Objects.requireNonNull(outputPath, "outputPath");
         try {
-            Files.createDirectories(outputPath.getParent());
-            Files.writeString(outputPath, buildYaml());
+            Path parent = outputPath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            String yaml = buildYaml();
+            Files.writeString(outputPath, yaml);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Wrote MCP OpenAPI spec path={} bytes={} includeWebSocketHelpers={} servers={} version={}",
+                        outputPath, yaml.length(), includeWebSocketHelpers, servers.size(), version);
+            }
         } catch (IOException e) {
+            LOG.error("Unable to write OpenAPI spec path={} includeWebSocketHelpers={} servers={} version={}",
+                    outputPath, includeWebSocketHelpers, servers.size(), version, e);
             throw new UncheckedIOException("Unable to write OpenAPI spec to " + outputPath, e);
         }
     }

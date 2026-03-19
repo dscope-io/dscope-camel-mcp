@@ -1,5 +1,8 @@
 package io.dscope.camel.mcp.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Configuration properties for MCP Apps Bridge.
  * 
@@ -8,13 +11,15 @@ package io.dscope.camel.mcp.config;
  */
 public class McpAppsConfiguration {
 
+    private static final Logger LOG = LoggerFactory.getLogger(McpAppsConfiguration.class);
+
     public static final long DEFAULT_SESSION_TIMEOUT_MS = 3600000L; // 1 hour
     public static final boolean DEFAULT_ENABLED = true;
 
     private boolean enabled = DEFAULT_ENABLED;
     private long sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS;
     private String hostName = "camel-mcp";
-    private String hostVersion = "1.4.0";
+    private String hostVersion = "1.4.1";
 
     public McpAppsConfiguration() {
     }
@@ -26,7 +31,7 @@ public class McpAppsConfiguration {
      * - mcp.apps.enabled (boolean, default: true)
      * - mcp.apps.session.timeout (long milliseconds, default: 3600000)
      * - mcp.apps.host.name (string, default: camel-mcp)
-    * - mcp.apps.host.version (string, default: 1.4.0)
+    * - mcp.apps.host.version (string, default: 1.4.1)
      * 
      * @return configuration instance
      */
@@ -43,7 +48,8 @@ public class McpAppsConfiguration {
             try {
                 config.sessionTimeoutMs = Long.parseLong(timeoutProp);
             } catch (NumberFormatException e) {
-                // Use default
+                LOG.warn("Invalid mcp.apps.session.timeout value '{}' ; using default {}",
+                        timeoutProp, DEFAULT_SESSION_TIMEOUT_MS);
             }
         }
         

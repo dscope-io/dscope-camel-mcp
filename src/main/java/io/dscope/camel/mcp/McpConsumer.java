@@ -1,12 +1,14 @@
 package io.dscope.camel.mcp;
 
 import org.apache.camel.Processor;
+import org.apache.camel.Exchange;
 import org.apache.camel.component.undertow.UndertowConsumer;
 import org.apache.camel.component.undertow.UndertowEndpoint;
 import org.apache.camel.support.DefaultConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dscope.camel.mcp.processor.McpJsonRpcEnvelopeProcessor;
@@ -23,6 +25,8 @@ import io.dscope.camel.mcp.processor.McpHttpValidatorProcessor;
  */
 public class McpConsumer extends DefaultConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(McpConsumer.class);
+    private static final int JSON_RPC_INVALID_REQUEST = -32600;
+    private static final int JSON_RPC_INTERNAL_ERROR = -32603;
     
     private final McpEndpoint endpoint;
     private final McpRequestSizeGuardProcessor requestSizeGuard;
@@ -62,6 +66,7 @@ public class McpConsumer extends DefaultConsumer {
         
         // Build processor chain: MCP guards/parsing -> user processor -> response normalization.
         Processor mcpProcessor = exchange -> {
+            long startedAtNanos = System.nanoTime();
             try {
                 // 1) Validate request size first to protect resources.
                 requestSizeGuard.process(exchange);
@@ -74,6 +79,13 @@ public class McpConsumer extends DefaultConsumer {
                 // 3) Apply rate limiting and parse JSON-RPC envelope metadata.
                 rateLimit.process(exchange);
                 jsonRpcEnvelope.process(exchange);
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Incoming MCP {} method={} id={}",
+                            exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE),
+                            exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD),
+                            exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID));
+                }
                 
                 // 4) Delegate business handling to the route processor.
                 getProcessor().process(exchange);
@@ -84,7 +96,11 @@ public class McpConsumer extends DefaultConsumer {
                     try {
                         String json = objectMapper.writeValueAsString(body);
                         exchange.getMessage().setBody(json);
-                    } catch (Exception e) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Serialized MCP response body type={} size={}B",
+                                    body.getClass().getName(), json.length());
+                        }
+                    } catch (JsonProcessingException e) {
                         String bodyType = body.getClass().getName();
                         String bodyPreview = body.toString();
                         if (bodyPreview.length() > 100) {
@@ -100,9 +116,37 @@ public class McpConsumer extends DefaultConsumer {
                 if (exchange.getMessage().getHeader("Content-Type") == null) {
                     exchange.getMessage().setHeader("Content-Type", "application/json");
                 }
+
+                if (LOG.isDebugEnabled()) {
+                    long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
+                    LOG.debug("Completed MCP request method={} id={} durationMs={} outBodyType={}",
+                            exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD),
+                            exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID),
+                            durationMs,
+                            exchange.getMessage().getBody() != null
+                                    ? exchange.getMessage().getBody().getClass().getName()
+                                    : "<null>");
+                }
+            } catch (IllegalArgumentException e) {
+                long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
+                LOG.warn("Rejected MCP request type={} method={} id={} endpoint={} durationMs={} reason={}",
+                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE),
+                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD),
+                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID),
+                        endpoint.getEndpointUri(),
+                        durationMs,
+                        e.getMessage());
+                writeJsonRpcError(exchange, JSON_RPC_INVALID_REQUEST, e.getMessage(), 400);
             } catch (Exception e) {
-                LOG.error("Error processing MCP request", e);
-                throw e;
+                long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
+                LOG.error("Error processing MCP request type={} method={} id={} endpoint={} durationMs={}",
+                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE),
+                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD),
+                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID),
+                        endpoint.getEndpointUri(),
+                        durationMs,
+                        e);
+                writeJsonRpcError(exchange, JSON_RPC_INTERNAL_ERROR, "An unexpected error occurred", 500);
             }
         };
         
@@ -172,5 +216,34 @@ public class McpConsumer extends DefaultConsumer {
         String currentUri = uri.toString();
         uri.append(currentUri.contains("?") ? "&" : "?");
         uri.append(param).append("=").append(value);
+    }
+
+    private void writeJsonRpcError(Exchange exchange, int code, String message, int statusCode) {
+        try {
+            Object id = exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID);
+
+            java.util.Map<String, Object> error = new java.util.LinkedHashMap<>();
+            error.put("code", code);
+            error.put("message", message);
+
+            java.util.Map<String, Object> envelope = new java.util.LinkedHashMap<>();
+            envelope.put("jsonrpc", "2.0");
+            envelope.put("id", id);
+            envelope.put("error", error);
+
+            exchange.getMessage().setBody(objectMapper.writeValueAsString(envelope));
+            exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE, statusCode);
+            exchange.getMessage().setHeader(Exchange.CONTENT_TYPE, "application/json");
+            exchange.getMessage().setHeader("Cache-Control", "no-store");
+
+            Object protocolVersion = exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION);
+            if (protocolVersion == null) {
+                protocolVersion = McpHttpValidatorProcessor.DEFAULT_PROTOCOL_VERSION;
+            }
+            exchange.getMessage().setHeader("MCP-Protocol-Version", protocolVersion.toString());
+        } catch (JsonProcessingException serializationError) {
+            LOG.error("Failed to serialize MCP error response endpoint={} code={}", endpoint.getEndpointUri(), code, serializationError);
+            throw new RuntimeException(serializationError);
+        }
     }
 }

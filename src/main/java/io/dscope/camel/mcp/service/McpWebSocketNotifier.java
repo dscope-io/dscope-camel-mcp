@@ -120,7 +120,8 @@ public class McpWebSocketNotifier {
             LOG.debug("Sent notification to session {}: {}", sessionId, notification.getMethod());
             return true;
         } catch (JsonProcessingException e) {
-            LOG.error("Failed to serialize notification", e);
+            LOG.error("Failed to serialize notification sessionId={} method={}",
+                    sessionId, notification != null ? notification.getMethod() : "<null>", e);
             return false;
         }
     }
@@ -178,7 +179,8 @@ public class McpWebSocketNotifier {
             producerTemplate.sendBodyAndHeader(webSocketEndpoint, json, "CamelWebSocketSendToAll", "true");
             LOG.debug("Broadcast notification: {}", notification.getMethod());
         } catch (Exception e) {
-            LOG.error("Failed to broadcast notification", e);
+            LOG.error("Failed to broadcast notification method={}",
+                    notification != null ? notification.getMethod() : "<null>", e);
         }
     }
 

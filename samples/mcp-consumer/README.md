@@ -52,6 +52,22 @@ To disable these demo timers (for cleaner startup logs), run:
 mvn compile exec:java -Dmcp.producer.demo.enabled=false
 ```
 
+## Troubleshooting logs
+
+To enable detailed MCP component logs during troubleshooting:
+
+```bash
+mvn compile exec:java \
+  -Dorg.slf4j.simpleLogger.log.io.dscope.camel.mcp=debug \
+  -Dorg.slf4j.simpleLogger.showDateTime=true
+```
+
+If your runtime uses Logback, add logger entries for:
+
+- `io.dscope.camel.mcp`
+- `io.dscope.camel.mcp.processor`
+- `io.dscope.camel.mcp.service`
+
 ## Quick test
 
 ```bash

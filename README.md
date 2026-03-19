@@ -15,8 +15,8 @@ _Note: These values mirror the GitHub repository settings (Description, Topics, 
 
 | Channel | Version | Maven Coordinate | Notes |
 | --- | --- | --- | --- |
-| Latest Release | 1.4.0 | `io.dscope.camel:camel-mcp:1.4.0` | Recommended for production use |
-| Development Snapshot | 1.4.0 | `io.dscope.camel:camel-mcp:1.4.0` | Build from source (`mvn install`) to track `main` |
+| Latest Release | 1.4.1 | `io.dscope.camel:camel-mcp:1.4.1` | Recommended for production use |
+| Development Snapshot | 1.4.1 | `io.dscope.camel:camel-mcp:1.4.1` | Build from source (`mvn install`) to track `main` |
 
 Maven Central:
 - https://central.sonatype.com/artifact/io.dscope.camel/camel-mcp
@@ -51,7 +51,7 @@ Maven Central:
 <dependency>
   <groupId>io.dscope.camel</groupId>
   <artifactId>camel-mcp</artifactId>
-  <version>1.4.0</version>
+  <version>1.4.1</version>
 </dependency>
 ```
 
@@ -59,7 +59,7 @@ Maven Central:
 
 ```groovy
 dependencies {
-  implementation "io.dscope.camel:camel-mcp:1.4.0"
+  implementation "io.dscope.camel:camel-mcp:1.4.1"
 }
 ```
 
@@ -438,7 +438,7 @@ Response includes a `sessionId` for subsequent UI calls:
 {
   "result": {
     "sessionId": "abc123-...",
-    "hostInfo": {"name": "camel-mcp", "version": "1.4.0"},
+    "hostInfo": {"name": "camel-mcp", "version": "1.4.1"},
     "capabilities": ["tools/call", "ui/message", "ui/update-model-context"]
   }
 }

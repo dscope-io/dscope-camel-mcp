@@ -23,11 +23,13 @@ public class McpNotificationProcessor extends AbstractMcpRequestProcessor {
     protected void handleRequest(Exchange exchange, Map<String, Object> parameters) {
         String method = getJsonRpcMethod(exchange);
         if (method == null || !method.startsWith("notifications/")) {
+            LOG.error("Invalid MCP notification exchange method={} id={}", method, getJsonRpcId(exchange));
             throw new IllegalArgumentException("Exchange does not hold an MCP notification");
         }
 
         String type = method.substring("notifications/".length()).trim();
         if (type.isEmpty()) {
+            LOG.error("Invalid MCP notification type extracted from method={} id={}", method, getJsonRpcId(exchange));
             throw new IllegalArgumentException("Notification method must include a type segment");
         }
 
@@ -40,8 +42,9 @@ public class McpNotificationProcessor extends AbstractMcpRequestProcessor {
         exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_NOTIFICATION_PARAMS, params);
         exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_NOTIFICATION_TYPE, type);
 
-        if (LOG.isInfoEnabled()) {
-            LOG.info("Received MCP notification '{}' with params {}", type, params);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Received MCP notification type={} id={} paramKeys={}",
+                    type, getJsonRpcId(exchange), params.keySet());
         }
     }
 

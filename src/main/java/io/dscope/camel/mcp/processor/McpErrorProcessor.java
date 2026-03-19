@@ -5,12 +5,16 @@ import java.util.Map;
 
 import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Serializes JSON-RPC error envelopes using properties set by upstream processors.
  */
 @BindToRegistry("mcpError")
 public class McpErrorProcessor extends AbstractMcpResponseProcessor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpErrorProcessor.class);
 
     public static final String PROPERTY_ERROR_CODE = "mcp.error.code";
     public static final String PROPERTY_ERROR_MESSAGE = "mcp.error.message";
@@ -35,6 +39,11 @@ public class McpErrorProcessor extends AbstractMcpResponseProcessor {
         error.put("message", message);
         if (data != null && !data.isEmpty()) {
             error.put("data", data);
+        }
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Writing MCP error response id={} method={} code={} hasData={}",
+                    getJsonRpcId(exchange), getJsonRpcMethod(exchange), code.intValue(), data != null && !data.isEmpty());
         }
 
         writeError(exchange, error, 0);

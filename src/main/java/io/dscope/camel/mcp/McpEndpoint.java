@@ -9,6 +9,8 @@ import org.apache.camel.spi.UriEndpoint;
 import org.apache.camel.spi.UriParam;
 import org.apache.camel.spi.UriPath;
 import org.apache.camel.support.DefaultEndpoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Camel component for the Model Context Protocol (MCP).
@@ -30,6 +32,8 @@ import org.apache.camel.support.DefaultEndpoint;
 })
 public class McpEndpoint extends DefaultEndpoint {
 
+    private static final Logger LOG = LoggerFactory.getLogger(McpEndpoint.class);
+
     @UriPath(description = "The target MCP server URI (e.g. http://localhost:8080/mcp). "
             + "For consumers this is the listen address; for producers the remote server address.")
     @Metadata(required = true)
@@ -50,8 +54,24 @@ public class McpEndpoint extends DefaultEndpoint {
         this.configuration = configuration;
     }
 
-    @Override public Producer createProducer() { return new McpProducer(this); }
-    @Override public Consumer createConsumer(Processor processor) { return new McpConsumer(this, processor); }
+    @Override
+    public Producer createProducer() {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Creating MCP producer endpointUri={} targetUri={} method={}",
+                    getEndpointUri(), configuration.getUri(), configuration.getMethod());
+        }
+        return new McpProducer(this);
+    }
+
+    @Override
+    public Consumer createConsumer(Processor processor) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Creating MCP consumer endpointUri={} listenUri={} websocket={}",
+                    getEndpointUri(), configuration.getUri(), configuration.isWebsocket());
+        }
+        return new McpConsumer(this, processor);
+    }
+
     @Override public boolean isSingleton() { return true; }
 
     public McpConfiguration getConfiguration() { return configuration; }

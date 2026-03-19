@@ -8,12 +8,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Token-bucket rate limiter for MCP requests with system property configuration.
  */
 @BindToRegistry("mcpRateLimit")
 public class McpRateLimitProcessor implements Processor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpRateLimitProcessor.class);
 
     private final boolean enabled;
     private final int capacity;
@@ -45,11 +49,16 @@ public class McpRateLimitProcessor implements Processor {
         synchronized (this) {
             int tokens = availableTokens.get();
             if (tokens <= 0) {
+                LOG.error("MCP rate limit exceeded capacity={} refillPerSecond={} availableTokens={}",
+                        capacity, getRefillPerSecond(), tokens);
                 throw new IllegalArgumentException("Rate limit exceeded: no tokens available (capacity " + capacity + ")");
             }
             remaining = availableTokens.decrementAndGet();
         }
         exchange.setProperty("mcp.rate.tokensRemaining", remaining);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("MCP rate limiter accepted request tokensRemaining={}", remaining);
+        }
     }
 
     private void refillTokens(long now) {

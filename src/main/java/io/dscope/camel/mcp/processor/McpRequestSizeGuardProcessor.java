@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple per-request size guard to reject overly large MCP JSON-RPC payloads before parsing.
@@ -13,6 +15,8 @@ import org.apache.camel.Processor;
  */
 @BindToRegistry("mcpRequestSizeGuard")
 public class McpRequestSizeGuardProcessor implements Processor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpRequestSizeGuardProcessor.class);
 
     private final int maxBytes;
     private final boolean enabled;
@@ -45,7 +49,13 @@ public class McpRequestSizeGuardProcessor implements Processor {
         }
         int length = bytes.length;
         if (length > maxBytes) {
+            LOG.error("MCP request rejected by size guard size={} max={} bodyType={}",
+                    length, maxBytes, body.getClass().getName());
             throw new IllegalArgumentException("Request body too large (" + length + " bytes, max " + maxBytes + ")");
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("MCP request size check passed size={} max={} bodyType={}",
+                    length, maxBytes, body.getClass().getName());
         }
     }
 

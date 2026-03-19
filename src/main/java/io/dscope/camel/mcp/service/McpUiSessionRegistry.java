@@ -75,6 +75,7 @@ public class McpUiSessionRegistry {
             } catch (InterruptedException e) {
                 cleanupExecutor.shutdownNow();
                 Thread.currentThread().interrupt();
+                LOG.warn("Interrupted while stopping MCP UI Session Registry", e);
             }
             sessions.clear();
             LOG.info("MCP UI Session Registry stopped");
@@ -178,6 +179,10 @@ public class McpUiSessionRegistry {
      * @return true if the notification was sent successfully
      */
     public boolean sendNotification(String sessionId, McpUiNotification notification) {
+        if (notification == null) {
+            LOG.error("Cannot send null notification to session {}", sessionId);
+            return false;
+        }
         return get(sessionId).map(session -> {
             Object transport = session.getTransport();
             if (transport != null) {
@@ -187,7 +192,11 @@ public class McpUiSessionRegistry {
             // For postMessage-based sessions, notifications are queued for polling
             LOG.debug("Session {} has no transport, notification queued", sessionId);
             return true;
-        }).orElse(false);
+        }).orElseGet(() -> {
+            LOG.debug("Cannot deliver notification method={} because session {} is missing or expired",
+                    notification.getMethod(), sessionId);
+            return false;
+        });
     }
 
     /**
@@ -229,7 +238,9 @@ public class McpUiSessionRegistry {
     private boolean sendViaTransport(Object transport, McpUiNotification notification) {
         // TODO: Implement WebSocket transport sending
         // This will be implemented in Phase 6 when WebSocket enhancements are added
-        LOG.debug("Transport notification: method={}", notification.getMethod());
+        LOG.debug("Transport notification: method={} transportType={}",
+                notification.getMethod(), transport.getClass().getName());
+        LOG.warn("Transport delivery is not implemented yet; notification method={} was not sent", notification.getMethod());
         return true;
     }
 
@@ -239,17 +250,21 @@ public class McpUiSessionRegistry {
     }
 
     private void cleanupExpiredSessions() {
-        int before = sessions.size();
-        sessions.entrySet().removeIf(entry -> {
-            if (isExpired(entry.getValue())) {
-                LOG.debug("Expiring session id={}", entry.getKey());
-                return true;
+        try {
+            int before = sessions.size();
+            sessions.entrySet().removeIf(entry -> {
+                if (isExpired(entry.getValue())) {
+                    LOG.debug("Expiring session id={}", entry.getKey());
+                    return true;
+                }
+                return false;
+            });
+            int removed = before - sessions.size();
+            if (removed > 0) {
+                LOG.info("Cleaned up {} expired UI sessions, {} remaining", removed, sessions.size());
             }
-            return false;
-        });
-        int removed = before - sessions.size();
-        if (removed > 0) {
-            LOG.info("Cleaned up {} expired UI sessions, {} remaining", removed, sessions.size());
+        } catch (Exception e) {
+            LOG.error("Failed while cleaning up expired UI sessions", e);
         }
     }
 

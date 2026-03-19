@@ -11,6 +11,8 @@ import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.Processor;
 import org.apache.camel.TypeConversionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +22,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 @BindToRegistry("mcpJsonRpcEnvelope")
 public class McpJsonRpcEnvelopeProcessor implements Processor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpJsonRpcEnvelopeProcessor.class);
 
     public static final String EXCHANGE_PROPERTY_RAW_MESSAGE = "mcp.jsonrpc.raw";
     public static final String EXCHANGE_PROPERTY_TYPE = "mcp.jsonrpc.type";
@@ -44,37 +48,51 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
             throw new IllegalArgumentException("Exchange must not be null");
         }
 
-        Message message = exchange.getIn();
-        Map<String, Object> payload = readPayload(exchange, message);
-        if (payload == null) {
-            String bodyType = Optional.ofNullable(exchange.getProperty("mcp.jsonrpc.bodyType", String.class)).orElse("<unknown>");
-            String bodyText = Optional.ofNullable(exchange.getProperty("mcp.jsonrpc.bodyText", String.class)).orElse(null);
-            int previewLength = bodyText == null ? 0 : Math.min(bodyText.length(), 200);
-            String preview = bodyText == null ? "<null>" : bodyText.substring(0, previewLength);
-            throw new IllegalArgumentException("JSON-RPC payload must be an object (bodyType=" + bodyType + ", preview=" + preview + ")");
-        }
+        try {
+            Message message = exchange.getIn();
+            Map<String, Object> payload = readPayload(exchange, message);
+            if (payload == null) {
+                String bodyType = Optional.ofNullable(exchange.getProperty("mcp.jsonrpc.bodyType", String.class)).orElse("<unknown>");
+                String bodyText = Optional.ofNullable(exchange.getProperty("mcp.jsonrpc.bodyText", String.class)).orElse(null);
+                int previewLength = bodyText == null ? 0 : Math.min(bodyText.length(), 200);
+                String preview = bodyText == null ? "<null>" : bodyText.substring(0, previewLength);
+                throw new IllegalArgumentException("JSON-RPC payload must be an object (bodyType=" + bodyType + ", preview=" + preview + ")");
+            }
 
-        exchange.setProperty(EXCHANGE_PROPERTY_RAW_MESSAGE, payload);
+            exchange.setProperty(EXCHANGE_PROPERTY_RAW_MESSAGE, payload);
 
-        String version = asTrimmedString(payload.get("jsonrpc"))
-                .orElseThrow(() -> new IllegalArgumentException("jsonrpc version is required"));
-        if (!"2.0".equals(version)) {
-            throw new IllegalArgumentException("Unsupported jsonrpc version: " + version);
-        }
+            String version = asTrimmedString(payload.get("jsonrpc"))
+                    .orElseThrow(() -> new IllegalArgumentException("jsonrpc version is required"));
+            if (!"2.0".equals(version)) {
+                throw new IllegalArgumentException("Unsupported jsonrpc version: " + version);
+            }
 
-        Object idValue = payload.get("id");
-        boolean hasId = payload.containsKey("id") && idValue != null;
-        asTrimmedString(payload.get("method"))
-                .ifPresentOrElse(method -> handleMethod(exchange, payload, method, hasId, idValue), () -> {
-                    if (payload.containsKey("result") || payload.containsKey("error")) {
-                        exchange.setProperty(EXCHANGE_PROPERTY_TYPE, MessageType.RESPONSE.name());
-                        if (payload.containsKey("id")) {
-                            exchange.setProperty(EXCHANGE_PROPERTY_ID, idValue);
+            Object idValue = payload.get("id");
+            boolean hasId = payload.containsKey("id") && idValue != null;
+            asTrimmedString(payload.get("method"))
+                    .ifPresentOrElse(method -> handleMethod(exchange, payload, method, hasId, idValue), () -> {
+                        if (payload.containsKey("result") || payload.containsKey("error")) {
+                            exchange.setProperty(EXCHANGE_PROPERTY_TYPE, MessageType.RESPONSE.name());
+                            if (payload.containsKey("id")) {
+                                exchange.setProperty(EXCHANGE_PROPERTY_ID, idValue);
+                            }
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Parsed JSON-RPC response id={} hasResult={} hasError={}",
+                                        idValue, payload.containsKey("result"), payload.containsKey("error"));
+                            }
+                        } else {
+                            throw new IllegalArgumentException("JSON-RPC payload must contain method, result or error");
                         }
-                    } else {
-                        throw new IllegalArgumentException("JSON-RPC payload must contain method, result or error");
-                    }
-                });
+                    });
+        } catch (IllegalArgumentException e) {
+            LOG.error("Invalid JSON-RPC payload bodyType={} method={} id={} reason={}",
+                    exchange.getProperty("mcp.jsonrpc.bodyType", String.class),
+                    exchange.getProperty(EXCHANGE_PROPERTY_METHOD),
+                    exchange.getProperty(EXCHANGE_PROPERTY_ID),
+                    e.getMessage(),
+                    e);
+            throw e;
+        }
     }
 
     private void handleMethod(Exchange exchange, Map<String, Object> payload, String method, boolean hasId, Object idValue) {
@@ -83,6 +101,12 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
         exchange.setProperty(EXCHANGE_PROPERTY_METHOD, method);
         if (hasId) {
             exchange.setProperty(EXCHANGE_PROPERTY_ID, idValue);
+        }
+
+        if (LOG.isDebugEnabled()) {
+            Object rawParams = payload.get("params");
+            LOG.debug("Parsed JSON-RPC {} method={} id={} hasParams={}",
+                    type.name(), method, idValue, rawParams != null);
         }
 
         Map<String, Object> params = asMap(payload.get("params"), "params");
@@ -236,6 +260,9 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
     private Map<String, Object> readPayload(Exchange exchange, Message message) {
         Object body = message.getBody();
         exchange.setProperty("mcp.jsonrpc.bodyType", body != null ? body.getClass().getName() : "<null>");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Reading JSON-RPC payload bodyType={}", exchange.getProperty("mcp.jsonrpc.bodyType"));
+        }
         if (body == null) {
             return null;
         }
@@ -258,11 +285,29 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
                 return null;
             }
             exchange.setProperty("mcp.jsonrpc.bodyText", json);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("JSON-RPC payload text size={}B", json.length());
+            }
             return OBJECT_MAPPER.readValue(json, MAP_TYPE_REFERENCE);
         } catch (IOException e) {
+            LOG.error("Unable to parse JSON-RPC payload bodyType={} bodyPreview={}",
+                    exchange.getProperty("mcp.jsonrpc.bodyType", String.class),
+                    previewBodyText(exchange.getProperty("mcp.jsonrpc.bodyText", String.class)),
+                    e);
             throw new IllegalArgumentException("Unable to parse JSON-RPC payload", e);
         } catch (TypeConversionException e) {
+            LOG.error("Unable to convert JSON-RPC payload to text bodyType={}",
+                    exchange.getProperty("mcp.jsonrpc.bodyType", String.class),
+                    e);
             throw new IllegalArgumentException("Unable to convert JSON-RPC payload to text", e);
         }
+    }
+
+    private String previewBodyText(String bodyText) {
+        if (bodyText == null) {
+            return "<null>";
+        }
+        int maxLength = Math.min(bodyText.length(), 200);
+        return bodyText.substring(0, maxLength);
     }
 }

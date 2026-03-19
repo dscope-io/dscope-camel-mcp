@@ -10,12 +10,16 @@ import org.apache.camel.BindToRegistry;
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.Processor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Validates HTTP transport headers for MCP requests.
  */
 @BindToRegistry("mcpHttpValidator")
 public class McpHttpValidatorProcessor implements Processor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(McpHttpValidatorProcessor.class);
 
     public static final String EXCHANGE_PROTOCOL_VERSION = "mcp.http.protocolVersion";
     public static final String DEFAULT_PROTOCOL_VERSION = "2025-06-18";
@@ -30,20 +34,31 @@ public class McpHttpValidatorProcessor implements Processor {
 
         Message in = exchange.getIn();
         String accept = in.getHeader("Accept", String.class);
-        if (!containsAllMediaTypes(accept, "application/json", "text/event-stream")) {
-            throw new IllegalArgumentException(
-                "Accept header must include application/json and text/event-stream for MCP Streamable HTTP transport");
-        }
-
         String contentType = in.getHeader("Content-Type", String.class);
-        if (!containsAnyMediaType(contentType, "application/json")) {
-            throw new IllegalArgumentException("Content-Type must be application/json for MCP requests");
-        }
+        try {
+            if (!containsAllMediaTypes(accept, "application/json", "text/event-stream")) {
+                throw new IllegalArgumentException(
+                    "Accept header must include application/json and text/event-stream for MCP Streamable HTTP transport");
+            }
 
-        String protocolVersion = normalize(in.getHeader("MCP-Protocol-Version", String.class))
-                .filter(SUPPORTED_VERSIONS::contains)
-                .orElse(DEFAULT_PROTOCOL_VERSION);
-        exchange.setProperty(EXCHANGE_PROTOCOL_VERSION, protocolVersion);
+            if (!containsAnyMediaType(contentType, "application/json")) {
+                throw new IllegalArgumentException("Content-Type must be application/json for MCP requests");
+            }
+
+            String protocolVersion = normalize(in.getHeader("MCP-Protocol-Version", String.class))
+                    .filter(SUPPORTED_VERSIONS::contains)
+                    .orElse(DEFAULT_PROTOCOL_VERSION);
+            exchange.setProperty(EXCHANGE_PROTOCOL_VERSION, protocolVersion);
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Validated HTTP MCP headers protocolVersion={} accept={} contentType={}",
+                        protocolVersion, accept, contentType);
+            }
+        } catch (IllegalArgumentException e) {
+            LOG.error("Invalid HTTP MCP headers accept={} contentType={} reason={}",
+                    accept, contentType, e.getMessage());
+            throw e;
+        }
     }
 
     private Optional<String> normalize(String header) {
