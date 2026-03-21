@@ -13,13 +13,13 @@ This sample hosts both HTTP and WebSocket MCP services using the Camel MCP compo
 ```bash
 # from the repository root
 mvn clean install
-mvn -f samples/mcp-service/pom.xml exec:java
+mvn -f samples/mcp-service/pom.xml compile exec:java
 ```
 
 The exec goal boots both HTTP (`http://localhost:8080/mcp`) and WebSocket (`ws://localhost:8090/mcp`) endpoints by loading the standard routes. If you only need WebSocket, pass:
 
 ```bash
-mvn -f samples/mcp-service/pom.xml exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml
+mvn -f samples/mcp-service/pom.xml compile exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-ws.yaml
 ```
 
 ### Kamelet-powered variant
@@ -27,7 +27,7 @@ mvn -f samples/mcp-service/pom.xml exec:java -Dcamel.main.routesIncludePattern=c
 Run the Kamelet template (REST + WS) instead of the raw routes:
 
 ```bash
-mvn -f samples/mcp-service/pom.xml exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-kamelet.camel.yaml
+mvn -f samples/mcp-service/pom.xml compile exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-service-kamelet.camel.yaml
 ```
 
 This starts:
@@ -50,7 +50,7 @@ MCP producer local dispatch result: {...}
 To disable these demo timers (for cleaner startup logs), run:
 
 ```bash
-mvn -f samples/mcp-service/pom.xml exec:java -Dmcp.producer.demo.enabled=false
+mvn -f samples/mcp-service/pom.xml compile exec:java -Dmcp.producer.demo.enabled=false
 ```
 
 You can change ports/paths by editing the query parameters on the Kamelet URIs inside `routes/mcp-service-kamelet.camel.yaml` (`restPort`, `wsPort`, `restContextPath`, `wsPath`).

@@ -177,10 +177,16 @@
       uri: timer:mcpProducerRemote?repeatCount=1&delay=4000
       steps:
         - setBody:
-            constant:
-              clientInfo:
-                name: mcp-service-remote-demo
-                version: "1.0.0"
+            constant: |
+              {
+                "clientInfo": {
+                  "name": "mcp-service-remote-demo",
+                  "version": "1.0.0"
+                }
+              }
+        - unmarshal:
+            json:
+              library: Jackson
         - to:
             uri: mcp:http://localhost:8080/mcp?method=initialize
         - log:
@@ -193,8 +199,13 @@
       uri: timer:mcpProducerLocal?repeatCount=1&delay=4000
       steps:
         - setBody:
-            constant:
-              probe: true
+            constant: |
+              {
+                "probe": true
+              }
+        - unmarshal:
+            json:
+              library: Jackson
         - to:
             uri: mcp:camel:direct:local-mcp-service?method=ping
         - log:
