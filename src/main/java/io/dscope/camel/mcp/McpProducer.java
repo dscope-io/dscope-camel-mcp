@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.dscope.camel.mcp.model.McpRequest;
 import io.dscope.camel.mcp.model.McpResponse;
+import io.dscope.camel.mcp.processor.McpHttpValidatorProcessor;
 import org.apache.camel.Exchange;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.support.DefaultProducer;
@@ -24,7 +25,10 @@ import java.util.UUID;
 public class McpProducer extends DefaultProducer {
     private static final Logger LOG = LoggerFactory.getLogger(McpProducer.class);
     public static final String HEADER_METHOD = "CamelMcpMethod";
+    public static final String HEADER_PROTOCOL_VERSION = "CamelMcpProtocolVersion";
     private static final String LOCAL_URI_PREFIX = "camel:";
+    private static final String MCP_ACCEPT = "application/json, text/event-stream";
+    private static final String JSON_CONTENT_TYPE = "application/json";
     private static final int PAYLOAD_PREVIEW_LIMIT = 4000;
 
     private final McpEndpoint endpoint;
@@ -96,8 +100,13 @@ public class McpProducer extends DefaultProducer {
             LOG.debug("Remote MCP request payload id={} method={} uri={} payload={}",
                     req.getId(), req.getMethod(), targetUri, previewText(json));
         }
+        Map<String, Object> transportHeaders = buildRemoteTransportHeaders();
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Remote MCP request headers id={} method={} uri={} headers={}",
+                req.getId(), req.getMethod(), targetUri, transportHeaders);
+        }
         ProducerTemplate template = endpoint.getCamelContext().createProducerTemplate();
-        String result = template.requestBody(targetUri, json, String.class);
+        String result = template.requestBodyAndHeaders(targetUri, json, transportHeaders, String.class);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Remote MCP response payload id={} method={} uri={} payload={}",
                     req.getId(), req.getMethod(), targetUri, previewText(result));
@@ -159,6 +168,34 @@ public class McpProducer extends DefaultProducer {
         Map<String, Object> params = new LinkedHashMap<>();
         rawParams.forEach((key, value) -> params.put(String.valueOf(key), value));
         return params;
+    }
+
+    private Map<String, Object> buildRemoteTransportHeaders() {
+        Map<String, Object> headers = new LinkedHashMap<>();
+        headers.put(Exchange.HTTP_METHOD, "POST");
+        headers.put("Accept", MCP_ACCEPT);
+        headers.put("Content-Type", JSON_CONTENT_TYPE);
+
+        String protocolVersion = resolveProtocolVersion();
+        if (protocolVersion != null && !protocolVersion.isBlank()) {
+            headers.put("MCP-Protocol-Version", protocolVersion);
+        }
+        return headers;
+    }
+
+    private String resolveProtocolVersion() {
+        String propertyValue = endpoint.getCamelContext()
+                .getGlobalOption(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION);
+        if (propertyValue != null && !propertyValue.isBlank()) {
+            return propertyValue;
+        }
+
+        String systemValue = System.getProperty(HEADER_PROTOCOL_VERSION);
+        if (systemValue != null && !systemValue.isBlank()) {
+            return systemValue;
+        }
+
+        return null;
     }
 
     private String previewPayload(Object payload) {

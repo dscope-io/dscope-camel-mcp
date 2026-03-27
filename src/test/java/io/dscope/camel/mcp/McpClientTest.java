@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.dscope.camel.mcp.model.McpResponse;
+import io.dscope.camel.mcp.processor.McpHttpValidatorProcessor;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.RouteBuilder;
@@ -13,10 +14,12 @@ import org.junit.jupiter.api.Test;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class McpClientTest {
@@ -102,7 +105,49 @@ public class McpClientTest {
         }
     }
 
+    @Test
+    public void shouldSendExplicitRemoteMcpHeaders() throws Exception {
+        AtomicReference<Map<String, Object>> seenHeaders = new AtomicReference<>();
+
+        try (CamelContext context = createContext(seenHeaders)) {
+            context.start();
+            ProducerTemplate template = context.createProducerTemplate();
+
+            Object resultObject = McpClient.callResult(template, MCP_ENDPOINT, "tools/list", Map.of());
+            assertTrue(resultObject instanceof Map<?, ?>);
+
+            Map<String, Object> headers = seenHeaders.get();
+            assertNotNull(headers);
+            assertEquals("POST", headers.get("CamelHttpMethod"));
+            assertEquals("application/json, text/event-stream", headers.get("Accept"));
+            assertEquals("application/json", headers.get("Content-Type"));
+            assertNull(headers.get("MCP-Protocol-Version"));
+        }
+    }
+
+    @Test
+    public void shouldSendProtocolVersionWhenConfiguredAsGlobalProperty() throws Exception {
+        AtomicReference<Map<String, Object>> seenHeaders = new AtomicReference<>();
+
+        try (CamelContext context = createContext(seenHeaders)) {
+            context.getGlobalOptions().put(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, "2025-06-18");
+            context.start();
+            ProducerTemplate template = context.createProducerTemplate();
+
+            Object resultObject = McpClient.callResult(template, MCP_ENDPOINT, "tools/list", Map.of());
+            assertTrue(resultObject instanceof Map<?, ?>);
+
+            Map<String, Object> headers = seenHeaders.get();
+            assertNotNull(headers);
+            assertEquals("2025-06-18", headers.get("MCP-Protocol-Version"));
+        }
+    }
+
     private CamelContext createContext() throws Exception {
+        return createContext(new AtomicReference<>());
+    }
+
+    private CamelContext createContext(AtomicReference<Map<String, Object>> seenHeaders) throws Exception {
         CamelContext context = new DefaultCamelContext();
         context.addComponent("mcp", new McpComponent());
 
@@ -111,6 +156,13 @@ public class McpClientTest {
             public void configure() {
                 from("direct:mcp-server")
                         .process(exchange -> {
+                            Map<String, Object> headers = new LinkedHashMap<>();
+                            headers.put("CamelHttpMethod", exchange.getMessage().getHeader("CamelHttpMethod"));
+                            headers.put("Accept", exchange.getMessage().getHeader("Accept"));
+                            headers.put("Content-Type", exchange.getMessage().getHeader("Content-Type"));
+                            headers.put("MCP-Protocol-Version", exchange.getMessage().getHeader("MCP-Protocol-Version"));
+                            seenHeaders.set(headers);
+
                             String requestJson = exchange.getMessage().getBody(String.class);
                             Map<String, Object> request = MAPPER.readValue(
                                     requestJson,
