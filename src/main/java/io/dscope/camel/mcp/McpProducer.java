@@ -1,5 +1,6 @@
 package io.dscope.camel.mcp;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.dscope.camel.mcp.model.McpRequest;
 import io.dscope.camel.mcp.model.McpResponse;
@@ -24,6 +25,7 @@ public class McpProducer extends DefaultProducer {
     private static final Logger LOG = LoggerFactory.getLogger(McpProducer.class);
     public static final String HEADER_METHOD = "CamelMcpMethod";
     private static final String LOCAL_URI_PREFIX = "camel:";
+    private static final int PAYLOAD_PREVIEW_LIMIT = 4000;
 
     private final McpEndpoint endpoint;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -43,8 +45,8 @@ public class McpProducer extends DefaultProducer {
         req.setParams(resolveParams(exchange));
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Dispatching MCP request id={} method={} targetUri={} paramKeys={}",
-                    req.getId(), req.getMethod(), cfg.getUri(), req.getParams().keySet());
+            LOG.debug("Dispatching MCP request id={} method={} targetUri={} paramKeys={} params={}",
+                req.getId(), req.getMethod(), cfg.getUri(), req.getParams().keySet(), previewPayload(req.getParams()));
         }
 
         McpResponse resp;
@@ -60,8 +62,8 @@ public class McpProducer extends DefaultProducer {
         if (LOG.isDebugEnabled()) {
             long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
             boolean hasError = resp != null && resp.getError() != null;
-            LOG.debug("Received MCP response id={} method={} durationMs={} hasError={}",
-                    req.getId(), req.getMethod(), durationMs, hasError);
+            LOG.debug("Received MCP response id={} method={} durationMs={} hasError={} response={}",
+                req.getId(), req.getMethod(), durationMs, hasError, previewPayload(resp));
         }
 
         exchange.getMessage().setBody(resp);
@@ -78,6 +80,10 @@ public class McpProducer extends DefaultProducer {
             Object localResponse = endpoint.getCamelContext()
                     .createProducerTemplate()
                     .requestBody(localUri, req, Object.class);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Local MCP response id={} method={} localUri={} payload={}",
+                        req.getId(), req.getMethod(), localUri, previewPayload(localResponse));
+            }
             return toMcpResponse(localResponse);
         }
 
@@ -86,8 +92,16 @@ public class McpProducer extends DefaultProducer {
             LOG.debug("Using remote MCP dispatch id={} method={} uri={}", req.getId(), req.getMethod(), targetUri);
         }
         String json = mapper.writeValueAsString(req);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Remote MCP request payload id={} method={} uri={} payload={}",
+                    req.getId(), req.getMethod(), targetUri, previewText(json));
+        }
         ProducerTemplate template = endpoint.getCamelContext().createProducerTemplate();
         String result = template.requestBody(targetUri, json, String.class);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Remote MCP response payload id={} method={} uri={} payload={}",
+                    req.getId(), req.getMethod(), targetUri, previewText(result));
+        }
         return mapper.readValue(result, McpResponse.class);
     }
 
@@ -102,7 +116,7 @@ public class McpProducer extends DefaultProducer {
         if (responseBody instanceof String json) {
             try {
                 return mapper.readValue(json, McpResponse.class);
-            } catch (Exception e) {
+            } catch (JsonProcessingException e) {
                 LOG.error("Failed to parse local MCP response JSON size={}B", json.length(), e);
                 throw new IllegalStateException("Failed to parse local MCP response JSON", e);
             }
@@ -145,5 +159,29 @@ public class McpProducer extends DefaultProducer {
         Map<String, Object> params = new LinkedHashMap<>();
         rawParams.forEach((key, value) -> params.put(String.valueOf(key), value));
         return params;
+    }
+
+    private String previewPayload(Object payload) {
+        if (payload == null) {
+            return "<null>";
+        }
+        try {
+            if (payload instanceof String text) {
+                return previewText(text);
+            }
+            return previewText(mapper.writeValueAsString(payload));
+        } catch (JsonProcessingException | RuntimeException e) {
+            return "<unserializable:" + payload.getClass().getName() + ">";
+        }
+    }
+
+    private String previewText(String text) {
+        if (text == null) {
+            return "<null>";
+        }
+        if (text.length() <= PAYLOAD_PREVIEW_LIMIT) {
+            return text;
+        }
+        return text.substring(0, PAYLOAD_PREVIEW_LIMIT) + "...<truncated " + (text.length() - PAYLOAD_PREVIEW_LIMIT) + " chars>";
     }
 }
