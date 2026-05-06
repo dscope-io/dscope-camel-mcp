@@ -4,11 +4,11 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.dscope.camel.samples</groupId>
     <artifactId>mcp-service-sample</artifactId>
-    <version>1.4.1</version>
+    <version>1.5.0</version>
     <name>Camel MCP Service Sample</name>
 
     <properties>
-        <camel.version>4.15.0</camel.version>
+        <camel.version>4.20.0</camel.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <exec.mainClass>io.dscope.camel.samples.mcp.McpServiceApplication</exec.mainClass>
@@ -18,7 +18,7 @@
         <dependency>
             <groupId>io.dscope.camel</groupId>
             <artifactId>camel-mcp</artifactId>
-            <version>1.4.1</version>
+            <version>1.5.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.camel</groupId>

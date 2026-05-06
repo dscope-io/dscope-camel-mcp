@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.dscope.camel</groupId>
     <artifactId>camel-mcp</artifactId>
-    <version>1.4.1</version>
+    <version>1.5.0</version>
     <name>Camel MCP Component</name>
     <properties>
-        <camel.version>4.15.0</camel.version>
+        <camel.version>4.20.0</camel.version>
         <jackson.version>2.20.0</jackson.version>
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.6</logback.version>

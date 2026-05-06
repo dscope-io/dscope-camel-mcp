@@ -27,7 +27,6 @@ public class McpConsumer extends DefaultConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(McpConsumer.class);
     private static final int JSON_RPC_INVALID_REQUEST = -32600;
     private static final int JSON_RPC_INTERNAL_ERROR = -32603;
-    private static final int PAYLOAD_PREVIEW_LIMIT = 4000;
     
     private final McpEndpoint endpoint;
     private final McpRequestSizeGuardProcessor requestSizeGuard;
@@ -82,11 +81,10 @@ public class McpConsumer extends DefaultConsumer {
                 jsonRpcEnvelope.process(exchange);
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Incoming MCP {} method={} id={} payload={}",
+                    LOG.debug("Incoming MCP {} method={} id={}",
                             exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE),
                             exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD),
-                        exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID),
-                        previewPayload(exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_RAW_MESSAGE)));
+                            exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID));
                 }
                 
                 // 4) Delegate business handling to the route processor.
@@ -99,8 +97,8 @@ public class McpConsumer extends DefaultConsumer {
                         String json = objectMapper.writeValueAsString(body);
                         exchange.getMessage().setBody(json);
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Serialized MCP response body type={} size={}B payload={}",
-                                    body.getClass().getName(), json.length(), previewText(json));
+                            LOG.debug("Serialized MCP response body type={} size={}B",
+                                    body.getClass().getName(), json.length());
                         }
                     } catch (JsonProcessingException e) {
                         String bodyType = body.getClass().getName();
@@ -121,14 +119,13 @@ public class McpConsumer extends DefaultConsumer {
 
                 if (LOG.isDebugEnabled()) {
                     long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
-                    LOG.debug("Completed MCP request method={} id={} durationMs={} outBodyType={} outPayload={}",
+                    LOG.debug("Completed MCP request method={} id={} durationMs={} outBodyType={}",
                             exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD),
                             exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID),
                             durationMs,
                             exchange.getMessage().getBody() != null
                                     ? exchange.getMessage().getBody().getClass().getName()
-                            : "<null>",
-                        previewPayload(exchange.getMessage().getBody()));
+                                    : "<null>");
                 }
             } catch (IllegalArgumentException e) {
                 long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
@@ -248,29 +245,5 @@ public class McpConsumer extends DefaultConsumer {
             LOG.error("Failed to serialize MCP error response endpoint={} code={}", endpoint.getEndpointUri(), code, serializationError);
             throw new RuntimeException(serializationError);
         }
-    }
-
-    private String previewPayload(Object payload) {
-        if (payload == null) {
-            return "<null>";
-        }
-        try {
-            if (payload instanceof String text) {
-                return previewText(text);
-            }
-            return previewText(objectMapper.writeValueAsString(payload));
-        } catch (JsonProcessingException | RuntimeException e) {
-            return String.valueOf(payload);
-        }
-    }
-
-    private String previewText(String text) {
-        if (text == null) {
-            return "<null>";
-        }
-        if (text.length() <= PAYLOAD_PREVIEW_LIMIT) {
-            return text;
-        }
-        return text.substring(0, PAYLOAD_PREVIEW_LIMIT) + "...<truncated " + (text.length() - PAYLOAD_PREVIEW_LIMIT) + " chars>";
     }
 }

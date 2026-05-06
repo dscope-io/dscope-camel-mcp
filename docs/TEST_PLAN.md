@@ -59,7 +59,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
     "protocolVersion": "2025-06-18",
     "serverInfo": {
       "name": "camel-mcp",
-      "version": "1.4.1"
+      "version": "1.5.0"
     },
     "capabilities": {
       "tools": { "listChanged": true },
@@ -288,7 +288,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
     "sessionId": "<UUID>",
     "hostInfo": {
       "name": "camel-mcp-host",
-      "version": "1.4.1"
+      "version": "1.5.0"
     },
     "capabilities": {
       "tools/call": true,
@@ -554,7 +554,7 @@ mvn exec:java -Dcamel.main.routesIncludePattern=classpath:routes/mcp-ws-service.
 {
   "status": "UP",
   "timestamp": "...",
-  "version": "1.4.1"
+  "version": "1.5.0"
 }
 ```
 
@@ -856,7 +856,7 @@ curl -s -X POST http://localhost:3000/mcp \
   "id": "1",
   "result": {
     "protocolVersion": "2025-06-18",
-    "serverInfo": { "name": "mcp-consumer-sample", "version": "1.4.1" },
+    "serverInfo": { "name": "mcp-consumer-sample", "version": "1.5.0" },
     "capabilities": { "tools/list": true, "tools/call": true, "ping": true, "resources/list": true }
   }
 }

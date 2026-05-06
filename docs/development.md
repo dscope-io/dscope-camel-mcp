@@ -8,7 +8,7 @@ This guide explains how to build MCP services using the Camel MCP component. You
 
 Artifact coordinates:
 
-- `io.dscope.camel:camel-mcp:1.4.1`
+- `io.dscope.camel:camel-mcp:1.5.0`
 
 Maven Central links:
 
@@ -25,35 +25,35 @@ For Maven and Gradle builds, `mavenCentral()` is enough; no extra repository con
     <dependency>
         <groupId>io.dscope.camel</groupId>
         <artifactId>camel-mcp</artifactId>
-        <version>1.4.1</version>
+        <version>1.5.0</version>
     </dependency>
     
     <!-- Camel runtime -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-main</artifactId>
-        <version>4.15.0</version>
+        <version>4.20.0</version>
     </dependency>
     
     <!-- HTTP/WebSocket transport -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-undertow</artifactId>
-        <version>4.15.0</version>
+        <version>4.20.0</version>
     </dependency>
     
     <!-- YAML route definitions -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-yaml-dsl</artifactId>
-        <version>4.15.0</version>
+        <version>4.20.0</version>
     </dependency>
     
     <!-- JSON serialization -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-jackson</artifactId>
-        <version>4.15.0</version>
+        <version>4.20.0</version>
     </dependency>
 </dependencies>
 ```
