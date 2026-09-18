@@ -42,7 +42,7 @@ public class McpConsumer extends DefaultConsumer {
         this.requestSizeGuard = new McpRequestSizeGuardProcessor();
         this.rateLimit = new McpRateLimitProcessor();
         this.jsonRpcEnvelope = new McpJsonRpcEnvelopeProcessor();
-        this.httpValidator = new McpHttpValidatorProcessor();
+        this.httpValidator = new McpHttpValidatorProcessor(endpoint.getConfiguration().getAllowedOrigins());
         this.objectMapper = new ObjectMapper();
     }
     
@@ -204,6 +204,8 @@ public class McpConsumer extends DefaultConsumer {
             // HTTP endpoint
             uri.append(baseUri);
             appendQueryParam(uri, "httpMethodRestrict", config.getHttpMethodRestrict());
+            appendQueryParam(uri, "muteException", "true");
+            appendQueryParam(uri, "maxEntitySize", String.valueOf(Integer.getInteger("mcp.maxRequestBytes", 32 * 1024)));
         }
         
         return uri.toString();

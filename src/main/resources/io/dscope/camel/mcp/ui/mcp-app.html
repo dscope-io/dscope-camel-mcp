@@ -229,6 +229,7 @@
             toolPrefix: getParam('prefix', ''),
             theme: getParam('theme', 'default'),
             mcpEndpoint: getParam('endpoint', '/mcp'),
+            parentOrigin: getParam('parentOrigin', window.location.origin),
             showNav: getParam('nav', 'true') === 'true',
             singleTool: getParam('tool', ''),
         };  // END CONFIG
@@ -267,7 +268,7 @@
                         resolve(response.result);
                     }
                 };
-                window.parent.postMessage(request, '*', [channel.port2]);
+                window.parent.postMessage(request, CONFIG.parentOrigin, [channel.port2]);
                 
                 // Timeout after 30 seconds
                 setTimeout(() => reject(new Error('Request timeout')), 30000);
@@ -277,7 +278,10 @@
         async function httpCall(request) {
             const response = await fetch(CONFIG.mcpEndpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/event-stream'
+                },
                 body: JSON.stringify(request)
             });
             
@@ -323,7 +327,7 @@
             }
             
             nav.innerHTML = tools.map(tool => 
-                `<button data-tool="${tool.name}" ${selectedTool?.name === tool.name ? 'class="active"' : ''}>${tool.title || tool.name}</button>`
+                `<button data-tool="${escapeHtml(tool.name)}" ${selectedTool?.name === tool.name ? 'class="active"' : ''}>${escapeHtml(tool.title || tool.name)}</button>`
             ).join('');
             
             nav.querySelectorAll('button').forEach(btn => {
@@ -348,8 +352,8 @@
             const required = schema.required || [];
             
             let html = `<form id="tool-form" class="card">
-                <h2>${tool.title || tool.name}</h2>
-                <p class="description">${tool.description || ''}</p>`;
+                <h2>${escapeHtml(tool.title || tool.name)}</h2>
+                <p class="description">${escapeHtml(tool.description || '')}</p>`;
             
             for (const [name, prop] of Object.entries(properties)) {
                 const isRequired = required.includes(name);
@@ -374,33 +378,33 @@
             
             if (prop.enum) {
                 return `<div class="form-group">
-                    <label>${label}${reqMark}</label>
-                    <select name="${name}" ${required ? 'required' : ''}>
+                    <label>${escapeHtml(label)}${reqMark}</label>
+                    <select name="${escapeHtml(name)}" ${required ? 'required' : ''}>
                         <option value="">Select...</option>
-                        ${prop.enum.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        ${prop.enum.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('')}
                     </select>
                 </div>`;
             }
             
             if (prop.type === 'boolean') {
                 return `<div class="form-group">
-                    <label><input type="checkbox" name="${name}"> ${label}</label>
+                    <label><input type="checkbox" name="${escapeHtml(name)}"> ${escapeHtml(label)}</label>
                 </div>`;
             }
             
             if (prop.type === 'array' || prop.type === 'object') {
                 return `<div class="form-group">
-                    <label>${label}${reqMark} (JSON)</label>
-                    <textarea name="${name}" placeholder="${prop.description || 'Enter JSON...'}"
+                    <label>${escapeHtml(label)}${reqMark} (JSON)</label>
+                    <textarea name="${escapeHtml(name)}" placeholder="${escapeHtml(prop.description || 'Enter JSON...')}"
                         ${required ? 'required' : ''}></textarea>
                 </div>`;
             }
             
             return `<div class="form-group">
-                <label>${label}${reqMark}</label>
-                <input type="${type}" name="${name}" 
-                       placeholder="${prop.description || ''}"
-                       ${prop.default !== undefined ? `value="${prop.default}"` : ''}
+                <label>${escapeHtml(label)}${reqMark}</label>
+                <input type="${type}" name="${escapeHtml(name)}"
+                       placeholder="${escapeHtml(prop.description || '')}"
+                       ${prop.default !== undefined ? `value="${escapeHtml(prop.default)}"` : ''}
                        ${required ? 'required' : ''}>
             </div>`;
         }

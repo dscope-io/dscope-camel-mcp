@@ -19,7 +19,7 @@ spec:
         title: REST Host
         description: Host/interface for the MCP HTTP endpoint.
         type: string
-        default: 0.0.0.0
+        default: 127.0.0.1
       restPort:
         title: REST Port
         description: Port for the MCP HTTP endpoint.
@@ -77,6 +77,8 @@ spec:
         type: io.dscope.camel.mcp.processor.McpRateLimitProcessor
       - name: mcpRequestSizeGuard
         type: io.dscope.camel.mcp.processor.McpRequestSizeGuardProcessor
+      - name: mcpHttpValidator
+        type: io.dscope.camel.mcp.processor.McpHttpValidatorProcessor
       - name: mcpUiSessionRegistry
         type: io.dscope.camel.mcp.service.McpUiSessionRegistry
       - name: mcpUiInitialize
@@ -92,7 +94,6 @@ spec:
     from:
       uri: "{{restComponent}}:http://{{restHost}}:{{restPort}}{{restContextPath}}?matchOnUriPrefix=true"
       steps:
-        - to: "log:io.dscope.camel.mcp.incoming?level=INFO&showAll=true&multiline=true&maxChars=10000"
         - log:
             loggingLevel: INFO
             message: "MCP Service Kamelet invoked on {{restComponent}}://{{restHost}}:{{restPort}}{{restContextPath}}${header.CamelHttpPath} (${header.CamelHttpMethod})"
@@ -124,6 +125,9 @@ spec:
                 steps:
                   - doTry:
                       steps:
+                        - to: "bean:mcpRequestSizeGuard"
+                        - to: "bean:mcpHttpValidator"
+                        - to: "bean:mcpRateLimit"
                         - to: "bean:mcpJsonRpcEnvelope"
                         - log:
                             loggingLevel: DEBUG

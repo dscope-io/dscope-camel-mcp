@@ -40,6 +40,9 @@ public class SampleResourcesGetProcessor extends McpResourcesGetProcessor {
     }
 
     private Map<String, Object> loadFromClasspath(String resourceName) {
+        if (!isSafeResourceName(resourceName)) {
+            return errorResource("Invalid resource name");
+        }
         // Use static helpers from parent class to detect content type
         if (isBinaryResource(resourceName)) {
             return loadBinaryResource(resourceName);
@@ -49,6 +52,15 @@ public class SampleResourcesGetProcessor extends McpResourcesGetProcessor {
         }
         // Default: treat as JSON (append .json extension)
         return loadJsonResource(resourceName);
+    }
+
+    private boolean isSafeResourceName(String resourceName) {
+        return resourceName != null
+                && !resourceName.isBlank()
+                && !resourceName.contains("..")
+                && !resourceName.startsWith("/")
+                && !resourceName.startsWith("\\")
+                && !resourceName.contains("\\");
     }
 
     private Map<String, Object> loadJsonResource(String resourceName) {

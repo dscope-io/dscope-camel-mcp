@@ -648,7 +648,7 @@ Legend: ✅ Pass | ❌ Fail | ⬜ Not Tested
 
 ## Changelog
 
-### v1.4.1 (2026-03-18)
+### v1.5.0 (2026-03-18)
 - **Bug Fix**: Fixed `ui/tools/call` returning empty text response
   - **Root Cause**: `McpJsonRpcEnvelopeProcessor.handleUiToolsCall()` was setting property `"mcp.uiSessionId"` but processors looked for `"mcp.ui.sessionId"` (via `EXCHANGE_PROPERTY_UI_SESSION_ID` constant)
   - **Solution**: Updated to use the constant `McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID` consistently

@@ -53,15 +53,14 @@ public class McpInitializeProcessor extends AbstractMcpResponseProcessor {
 
     private Map<String, Object> buildCapabilities(Map<String, Object> params) {
         Map<String, Object> capabilities = new LinkedHashMap<>();
-        capabilities.put("tools/list", Boolean.TRUE);
-        capabilities.put("tools/call", Boolean.TRUE);
-        capabilities.put("ping", Boolean.TRUE);
-        // MCP Apps Bridge capabilities
-        capabilities.put("ui/initialize", Boolean.TRUE);
-        capabilities.put("ui/message", Boolean.TRUE);
-        capabilities.put("ui/update-model-context", Boolean.TRUE);
-        capabilities.put("ui/notifications/tool-input", Boolean.TRUE);
-        capabilities.put("ui/notifications/tool-result", Boolean.TRUE);
+        capabilities.put("tools", Map.of());
+        capabilities.put("resources", Map.of());
+        capabilities.put("experimental", Map.of("camelMcpApps", Map.of(
+                "ui/initialize", Boolean.TRUE,
+                "ui/message", Boolean.TRUE,
+                "ui/update-model-context", Boolean.TRUE,
+                "ui/notifications/tool-input", Boolean.TRUE,
+                "ui/notifications/tool-result", Boolean.TRUE)));
         if (params.containsKey("logging")) {
             capabilities.put("logging", Map.of());
         }

@@ -51,6 +51,7 @@ public class McpUiToolsCallProcessor extends AbstractMcpResponseProcessor {
         // Validate session
         McpUiSession session = validateSession(exchange, sessionId);
         if (session == null) {
+            exchange.setRouteStop(true);
             return; // Error already written
         }
 
@@ -60,6 +61,7 @@ public class McpUiToolsCallProcessor extends AbstractMcpResponseProcessor {
 
         if (toolName == null || toolName.isBlank()) {
             writeError(exchange, createError(-32602, "Missing required parameter: name"), 400);
+            exchange.setRouteStop(true);
             return;
         }
 

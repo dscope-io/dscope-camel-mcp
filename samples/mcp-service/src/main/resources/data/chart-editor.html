@@ -90,6 +90,7 @@
 
         // Initialize on load
         window.addEventListener('message', (event) => {
+            if (event.source !== window.parent) return;
             if (event.data && event.data.type === 'mcp:init') {
                 mcpBridge.sessionId = event.data.sessionId;
                 if (event.data.initialData) {
@@ -122,7 +123,11 @@
             
             preview.innerHTML = data.data.map((val, i) => {
                 const height = (val / maxVal) * 150;
-                return `<div class="bar" style="height: ${height}px" title="${data.labels[i] || 'Item ' + (i+1)}: ${val}"></div>`;
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.height = `${height}px`;
+                bar.title = `${data.labels[i] || 'Item ' + (i+1)}: ${val}`;
+                return bar.outerHTML;
             }).join('');
             
             // Update model context with current configuration

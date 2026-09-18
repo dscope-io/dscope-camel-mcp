@@ -60,7 +60,12 @@ public abstract class McpComponentApplicationSupport {
         bindDefaultBeans(main);
         bindAdditionalBeans(main);
         configureRoutes(main);
-        main.run(args);
+        uiSessionRegistry.start();
+        try {
+            main.run(args);
+        } finally {
+            uiSessionRegistry.stop();
+        }
     }
 
     protected Main createMain() {

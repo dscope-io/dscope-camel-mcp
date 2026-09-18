@@ -16,7 +16,7 @@
 - route:
     id: mcp-service-ws
     from:
-      uri: "undertow:ws://0.0.0.0:8090/mcp?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+      uri: "undertow:ws://127.0.0.1:8090/mcp?sendToAll=false&allowedOrigins=http://localhost,http://127.0.0.1&exchangePattern=InOut"
       steps:
         - process:
             ref: mcpRequestSizeGuard
@@ -151,12 +151,12 @@
         - setHeader:
             name: CamelWebSocketSendToAll
             constant: "false"
-        - to: "undertow:ws://0.0.0.0:8090/mcp"
+        - to: "undertow:ws://127.0.0.1:8090/mcp"
 
 - route:
     id: mcp-service-ws-stream
     from:
-      uri: "undertow:http://0.0.0.0:8090/mcp/stream?httpMethodRestrict=GET"
+      uri: "undertow:http://127.0.0.1:8090/mcp/stream?httpMethodRestrict=GET&muteException=true"
       steps:
         - process:
             ref: mcpStream
@@ -164,7 +164,7 @@
 - route:
     id: mcp-service-ws-health
     from:
-      uri: "undertow:http://0.0.0.0:8090/mcp/health?httpMethodRestrict=GET"
+      uri: "undertow:http://127.0.0.1:8090/mcp/health?httpMethodRestrict=GET&muteException=true"
       steps:
         - process:
             ref: mcpHealthStatus
@@ -172,8 +172,14 @@
 - route:
     id: mcp-service-ws-notifications
     from:
-      uri: "undertow:http://0.0.0.0:8090/mcp/notifications?httpMethodRestrict=POST"
+      uri: "undertow:http://127.0.0.1:8090/mcp/notifications?httpMethodRestrict=POST&muteException=true&maxEntitySize=32768"
       steps:
+        - process:
+            ref: mcpRequestSizeGuard
+        - process:
+            ref: mcpHttpValidator
+        - process:
+            ref: mcpRateLimit
         - convertBodyTo:
             type: java.lang.String
         - log:
@@ -182,7 +188,7 @@
         - setHeader:
             name: CamelWebSocketSendToAll
             constant: "true"
-        - to: "undertow:ws://0.0.0.0:8090/mcp"
+        - to: "undertow:ws://127.0.0.1:8090/mcp"
         - setHeader:
             name: CamelHttpResponseCode
             constant: "202"

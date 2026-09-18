@@ -57,12 +57,12 @@ public class McpConsumerSampleApp {
             @Override
             public void configure() {
                 // HTTP MCP server on port 3000
-                from("mcp:http://0.0.0.0:3000/mcp")
+                from("mcp:http://127.0.0.1:3000/mcp")
                     .routeId("mcp-consumer-http")
                     .process(McpConsumerSampleApp::dispatch);
 
                 // WebSocket MCP server on port 3001
-                from("mcp:http://0.0.0.0:3001/mcp?websocket=true")
+                from("mcp:http://127.0.0.1:3001/mcp?websocket=true")
                     .routeId("mcp-consumer-ws")
                     .process(McpConsumerSampleApp::dispatch);
 
@@ -131,7 +131,7 @@ public class McpConsumerSampleApp {
             "protocolVersion", "2025-06-18",
             "serverInfo", Map.of(
                 "name", "mcp-consumer-sample",
-                "version", "1.4.1"
+                "version", "1.5.0"
             ),
             "capabilities", Map.of(
                 "tools/list", true,

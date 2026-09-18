@@ -135,7 +135,10 @@ public class McpResourcesReadProcessor extends AbstractMcpResponseProcessor {
             return html;
         }
         try {
-            String configJson = OBJECT_MAPPER.writeValueAsString(config);
+            String configJson = OBJECT_MAPPER.writeValueAsString(config)
+                    .replace("<", "\\u003c")
+                    .replace(">", "\\u003e")
+                    .replace("&", "\\u0026");
             // Use spread operator to merge config at end (user config wins)
             return html.replace(
                     "};  // END CONFIG",

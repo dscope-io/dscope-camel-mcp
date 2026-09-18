@@ -35,7 +35,6 @@ public class McpUiUpdateModelContextProcessor extends AbstractMcpResponseProcess
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     protected void handleResponse(Exchange exchange) {
         Map<String, Object> params = getRequestParameters(exchange);
         String sessionId = getSessionId(exchange);
@@ -60,17 +59,7 @@ public class McpUiUpdateModelContextProcessor extends AbstractMcpResponseProcess
         }
 
         // Update session with new context
-        if ("merge".equalsIgnoreCase(operation) && session.getModelContext() instanceof Map) {
-            Map<String, Object> existing = (Map<String, Object>) session.getModelContext();
-            if (context instanceof Map) {
-                existing.putAll((Map<String, Object>) context);
-                session.setModelContext(existing);
-            } else {
-                session.setModelContext(context);
-            }
-        } else {
-            session.setModelContext(context);
-        }
+        session.updateModelContext(context, "merge".equalsIgnoreCase(operation));
 
         // Store on exchange for downstream processing
         exchange.setProperty(EXCHANGE_PROPERTY_UI_MODEL_CONTEXT, context);

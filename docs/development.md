@@ -32,28 +32,28 @@ For Maven and Gradle builds, `mavenCentral()` is enough; no extra repository con
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-main</artifactId>
-        <version>4.20.0</version>
+        <version>4.22.0</version>
     </dependency>
     
     <!-- HTTP/WebSocket transport -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-undertow</artifactId>
-        <version>4.20.0</version>
+        <version>4.22.0</version>
     </dependency>
     
     <!-- YAML route definitions -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-yaml-dsl</artifactId>
-        <version>4.20.0</version>
+        <version>4.22.0</version>
     </dependency>
     
     <!-- JSON serialization -->
     <dependency>
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-jackson</artifactId>
-        <version>4.20.0</version>
+        <version>4.22.0</version>
     </dependency>
 </dependencies>
 ```
@@ -244,7 +244,7 @@ Add a second route for WebSocket in the same file:
 - route:
     id: mcp-ws-service
     from:
-      uri: "undertow:ws://0.0.0.0:8090/mcp?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+      uri: "undertow:ws://127.0.0.1:8090/mcp?sendToAll=false&allowedOrigins=http://localhost,http://127.0.0.1&exchangePattern=InOut"
       steps:
         - process:
             ref: mcpRequestSizeGuard

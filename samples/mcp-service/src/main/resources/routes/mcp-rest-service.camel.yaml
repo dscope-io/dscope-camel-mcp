@@ -22,7 +22,7 @@
 - route:
     id: mcp-service-http
     from:
-      uri: undertow:http://0.0.0.0:8080/mcp?httpMethodRestrict=POST
+      uri: undertow:http://127.0.0.1:8080/mcp?httpMethodRestrict=POST&muteException=true&maxEntitySize=32768
       steps:
         - process:
             ref: mcpRequestSizeGuard
@@ -60,6 +60,10 @@
                 steps:
                   - process:
                       ref: mcpResourcesList
+              - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/read'"
+                steps:
+                  - process:
+                      ref: mcpResourcesRead
               - simple: "${exchangeProperty.mcp.jsonrpc.method} == 'resources/get'"
                 steps:
                   - process:
@@ -137,7 +141,7 @@
 - route:
     id: mcp-service-stream
     from:
-      uri: undertow:http://0.0.0.0:8080/mcp/stream?httpMethodRestrict=GET
+      uri: undertow:http://127.0.0.1:8080/mcp/stream?httpMethodRestrict=GET&muteException=true
       steps:
         - process:
             ref: mcpStream
@@ -145,7 +149,7 @@
 - route:
     id: mcp-service-health
     from:
-      uri: undertow:http://0.0.0.0:8080/mcp/health?httpMethodRestrict=GET
+      uri: undertow:http://127.0.0.1:8080/mcp/health?httpMethodRestrict=GET&muteException=true
       steps:
         - process:
             ref: mcpHealthStatus

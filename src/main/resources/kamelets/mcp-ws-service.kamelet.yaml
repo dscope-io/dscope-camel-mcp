@@ -21,7 +21,7 @@ spec:
         title: WebSocket Host
         description: Host/interface for the WebSocket endpoint.
         type: string
-        default: 0.0.0.0
+        default: 127.0.0.1
       wsPort:
         title: WebSocket Port
         description: Port for the WebSocket endpoint.
@@ -91,7 +91,7 @@ spec:
       - name: mcpUiToolsCallPost
         type: io.dscope.camel.mcp.processor.McpUiToolsCallPostProcessor
     from:
-      uri: "{{wsComponent}}:ws://{{wsHost}}:{{wsPort}}{{wsPath}}?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+      uri: "{{wsComponent}}:ws://{{wsHost}}:{{wsPort}}{{wsPath}}?sendToAll=false&allowedOrigins=http://localhost,http://127.0.0.1&exchangePattern=InOut"
       steps:
         - process: { ref: mcpRequestSizeGuard }
         - process: { ref: mcpRateLimit }

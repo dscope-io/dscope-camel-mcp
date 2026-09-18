@@ -1,6 +1,7 @@
 package io.dscope.camel.mcp.processor;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -25,6 +26,20 @@ public class McpHttpValidatorProcessor implements Processor {
     public static final String DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
     private static final Set<String> SUPPORTED_VERSIONS = Set.of("2025-06-18");
+    private final Set<String> allowedOrigins;
+
+    public McpHttpValidatorProcessor() {
+        this(System.getProperty("mcp.allowedOrigins", "http://localhost,http://127.0.0.1"));
+    }
+
+    public McpHttpValidatorProcessor(String allowedOrigins) {
+        this(Arrays.stream((allowedOrigins == null ? "" : allowedOrigins).split(","))
+                .map(String::trim).filter(value -> !value.isEmpty()).collect(java.util.stream.Collectors.toUnmodifiableSet()));
+    }
+
+    McpHttpValidatorProcessor(Collection<String> allowedOrigins) {
+        this.allowedOrigins = Set.copyOf(allowedOrigins);
+    }
 
     @Override
     public void process(Exchange exchange) {
@@ -45,9 +60,16 @@ public class McpHttpValidatorProcessor implements Processor {
                 throw new IllegalArgumentException("Content-Type must be application/json for MCP requests");
             }
 
-            String protocolVersion = normalize(in.getHeader("MCP-Protocol-Version", String.class))
-                    .filter(SUPPORTED_VERSIONS::contains)
-                    .orElse(DEFAULT_PROTOCOL_VERSION);
+            String origin = normalize(in.getHeader("Origin", String.class)).orElse(null);
+            if (origin != null && !isAllowedOrigin(origin)) {
+                throw new IllegalArgumentException("Origin is not allowed");
+            }
+
+            Optional<String> requestedVersion = normalize(in.getHeader("MCP-Protocol-Version", String.class));
+            if (requestedVersion.isPresent() && !SUPPORTED_VERSIONS.contains(requestedVersion.get())) {
+                throw new IllegalArgumentException("Unsupported MCP protocol version: " + requestedVersion.get());
+            }
+            String protocolVersion = requestedVersion.orElse(DEFAULT_PROTOCOL_VERSION);
             exchange.setProperty(EXCHANGE_PROTOCOL_VERSION, protocolVersion);
 
             if (LOG.isDebugEnabled()) {
@@ -70,6 +92,14 @@ public class McpHttpValidatorProcessor implements Processor {
             return Optional.empty();
         }
         return Optional.of(normalized);
+    }
+
+    private boolean isAllowedOrigin(String origin) {
+        if (allowedOrigins.contains(origin)) {
+            return true;
+        }
+        return (allowedOrigins.contains("http://localhost") && origin.startsWith("http://localhost:"))
+                || (allowedOrigins.contains("http://127.0.0.1") && origin.startsWith("http://127.0.0.1:"));
     }
 
     private boolean containsAllMediaTypes(String header, String... required) {

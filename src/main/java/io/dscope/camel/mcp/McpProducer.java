@@ -35,8 +35,25 @@ public class McpProducer extends DefaultProducer {
 
     private final McpEndpoint endpoint;
     private final ObjectMapper mapper = new ObjectMapper();
+    private ProducerTemplate producerTemplate;
 
     public McpProducer(McpEndpoint endpoint) { super(endpoint); this.endpoint = endpoint; }
+
+    @Override
+    protected void doStart() throws Exception {
+        super.doStart();
+        producerTemplate = endpoint.getCamelContext().createProducerTemplate();
+        producerTemplate.start();
+    }
+
+    @Override
+    protected void doStop() throws Exception {
+        if (producerTemplate != null) {
+            producerTemplate.stop();
+            producerTemplate = null;
+        }
+        super.doStop();
+    }
 
     @Override
     public void process(Exchange exchange) throws Exception {
@@ -83,9 +100,7 @@ public class McpProducer extends DefaultProducer {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Using local MCP dispatch id={} method={} localUri={}", req.getId(), req.getMethod(), localUri);
             }
-            Object localResponse = endpoint.getCamelContext()
-                    .createProducerTemplate()
-                    .requestBody(localUri, req, Object.class);
+            Object localResponse = producerTemplate.requestBody(localUri, req, Object.class);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Local MCP response id={} method={} localUri={} payload={}",
                         req.getId(), req.getMethod(), localUri, previewPayload(localResponse));
@@ -107,13 +122,48 @@ public class McpProducer extends DefaultProducer {
             LOG.debug("Remote MCP request headers id={} method={} uri={} headers={}",
                 req.getId(), req.getMethod(), targetUri, transportHeaders);
         }
-        ProducerTemplate template = endpoint.getCamelContext().createProducerTemplate();
-        String result = template.requestBodyAndHeaders(targetUri, json, transportHeaders, String.class);
+        String result = producerTemplate.requestBodyAndHeaders(targetUri, json, transportHeaders, String.class);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Remote MCP response payload id={} method={} uri={} payload={}",
                     req.getId(), req.getMethod(), targetUri, previewText(result));
         }
-        return mapper.readValue(result, McpResponse.class);
+        return parseRemoteResponse(result, req.getId());
+    }
+
+    private McpResponse parseRemoteResponse(String body, String requestId) throws JsonProcessingException {
+        String trimmed = body == null ? "" : body.trim();
+        if (trimmed.startsWith("{")) {
+            return mapper.readValue(trimmed, McpResponse.class);
+        }
+        StringBuilder data = new StringBuilder();
+        for (String line : trimmed.split("\\R", -1)) {
+            if (line.isBlank()) {
+                McpResponse response = parseSseEvent(data, requestId);
+                if (response != null) {
+                    return response;
+                }
+                data.setLength(0);
+            } else if (line.startsWith("data:")) {
+                if (!data.isEmpty()) {
+                    data.append('\n');
+                }
+                data.append(line.substring("data:".length()).stripLeading());
+            }
+        }
+        McpResponse response = parseSseEvent(data, requestId);
+        if (response != null) {
+            return response;
+        }
+        throw new JsonProcessingException("MCP response did not contain a JSON-RPC result for request " + requestId) { };
+    }
+
+    private McpResponse parseSseEvent(StringBuilder data, String requestId) throws JsonProcessingException {
+        if (data.isEmpty() || "[DONE]".contentEquals(data.toString().trim())) {
+            return null;
+        }
+        McpResponse response = mapper.readValue(data.toString(), McpResponse.class);
+        return requestId.equals(response.getId()) && (response.getResult() != null || response.getError() != null)
+                ? response : null;
     }
 
     private McpResponse toMcpResponse(Object responseBody) {

@@ -63,7 +63,8 @@ public class McpUiMessageProcessor extends AbstractMcpResponseProcessor {
             exchange.setProperty(EXCHANGE_PROPERTY_UI_MESSAGE_TYPE, type);
         }
 
-        LOG.info("UI Message from session {}: type={} message={}", sessionId, type, rawMessage);
+        LOG.debug("UI message accepted sessionId={} type={} messageType={}", sessionId, type,
+                rawMessage.getClass().getSimpleName());
 
         // Acknowledge receipt
         Map<String, Object> result = newResultMap();

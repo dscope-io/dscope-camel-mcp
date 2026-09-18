@@ -248,7 +248,7 @@ WebSocket configuration via Undertow:
 
 ```yaml
 from:
-  uri: "undertow:ws://0.0.0.0:8090/mcp?sendToAll=false&allowedOrigins=*&exchangePattern=InOut"
+  uri: "undertow:ws://127.0.0.1:8090/mcp?sendToAll=false&allowedOrigins=http://localhost,http://127.0.0.1&exchangePattern=InOut"
 ```
 
 | Option | Value | Purpose |

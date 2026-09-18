@@ -27,9 +27,9 @@ public class McpConfiguration {
             description = "For WebSocket consumers, whether to broadcast messages to all connected clients.")
     private boolean sendToAll = false;
 
-    @UriParam(label = "consumer", defaultValue = "*",
-            description = "Comma-separated list of allowed CORS origins. Use * for any origin.")
-    private String allowedOrigins = "*";
+    @UriParam(label = "consumer", defaultValue = "http://localhost,http://127.0.0.1",
+            description = "Comma-separated allowlist of origins permitted to connect to the MCP server.")
+    private String allowedOrigins = "http://localhost,http://127.0.0.1";
 
     @UriParam(label = "consumer", defaultValue = "POST",
             description = "HTTP methods allowed by the consumer endpoint.")

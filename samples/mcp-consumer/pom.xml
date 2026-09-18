@@ -12,7 +12,7 @@
     </description>
 
     <properties>
-        <camel.version>4.20.0</camel.version>
+        <camel.version>4.22.0</camel.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <exec.mainClass>io.dscope.camel.samples.consumer.McpConsumerSampleApp</exec.mainClass>

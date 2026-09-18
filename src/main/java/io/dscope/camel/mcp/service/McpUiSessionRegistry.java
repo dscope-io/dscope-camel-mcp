@@ -30,7 +30,7 @@ public class McpUiSessionRegistry {
 
     private final Map<String, McpUiSession> sessions = new ConcurrentHashMap<>();
     private final long sessionTimeoutMs;
-    private final ScheduledExecutorService cleanupExecutor;
+    private ScheduledExecutorService cleanupExecutor;
     private volatile boolean running = false;
 
     public McpUiSessionRegistry() {
@@ -39,11 +39,7 @@ public class McpUiSessionRegistry {
 
     public McpUiSessionRegistry(long sessionTimeoutMs) {
         this.sessionTimeoutMs = sessionTimeoutMs > 0 ? sessionTimeoutMs : DEFAULT_SESSION_TIMEOUT_MS;
-        this.cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "mcp-ui-session-cleanup");
-            t.setDaemon(true);
-            return t;
-        });
+        this.cleanupExecutor = newCleanupExecutor();
     }
 
     /**
@@ -51,6 +47,9 @@ public class McpUiSessionRegistry {
      */
     public synchronized void start() {
         if (!running) {
+            if (cleanupExecutor.isShutdown()) {
+                cleanupExecutor = newCleanupExecutor();
+            }
             running = true;
             cleanupExecutor.scheduleAtFixedRate(
                     this::cleanupExpiredSessions,
@@ -121,6 +120,9 @@ public class McpUiSessionRegistry {
         if (session != null && !isExpired(session)) {
             return Optional.of(session);
         }
+        if (session != null) {
+            sessions.remove(sessionId, session);
+        }
         return Optional.empty();
     }
 
@@ -189,9 +191,8 @@ public class McpUiSessionRegistry {
                 // If we have a transport, delegate to it
                 return sendViaTransport(transport, notification);
             }
-            // For postMessage-based sessions, notifications are queued for polling
-            LOG.debug("Session {} has no transport, notification queued", sessionId);
-            return true;
+            LOG.debug("Session {} has no transport; notification was not delivered", sessionId);
+            return false;
         }).orElseGet(() -> {
             LOG.debug("Cannot deliver notification method={} because session {} is missing or expired",
                     notification.getMethod(), sessionId);
@@ -236,12 +237,10 @@ public class McpUiSessionRegistry {
     }
 
     private boolean sendViaTransport(Object transport, McpUiNotification notification) {
-        // TODO: Implement WebSocket transport sending
-        // This will be implemented in Phase 6 when WebSocket enhancements are added
         LOG.debug("Transport notification: method={} transportType={}",
                 notification.getMethod(), transport.getClass().getName());
-        LOG.warn("Transport delivery is not implemented yet; notification method={} was not sent", notification.getMethod());
-        return true;
+        LOG.warn("Transport delivery is not implemented; notification method={} was not sent", notification.getMethod());
+        return false;
     }
 
     private boolean isExpired(McpUiSession session) {
@@ -275,5 +274,13 @@ public class McpUiSessionRegistry {
      */
     public long getSessionTimeoutMs() {
         return sessionTimeoutMs;
+    }
+
+    private ScheduledExecutorService newCleanupExecutor() {
+        return Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "mcp-ui-session-cleanup");
+            t.setDaemon(true);
+            return t;
+        });
     }
 }

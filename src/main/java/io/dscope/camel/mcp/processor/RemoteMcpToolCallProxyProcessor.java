@@ -116,7 +116,7 @@ public class RemoteMcpToolCallProxyProcessor extends AbstractMcpResponseProcesso
         for (String line : body.split("\\R", -1)) {
             if (line.isBlank()) {
                 Map<String, Object> event = parseSseData(data);
-                if (!event.isEmpty()) {
+                if (isResponse(event)) {
                     return event;
                 }
                 data.setLength(0);
@@ -129,7 +129,8 @@ public class RemoteMcpToolCallProxyProcessor extends AbstractMcpResponseProcesso
                 data.append(line.substring("data:".length()).stripLeading());
             }
         }
-        return parseSseData(data);
+        Map<String, Object> event = parseSseData(data);
+        return isResponse(event) ? event : Map.of();
     }
 
     private Map<String, Object> parseSseData(StringBuilder data) throws IOException {
@@ -141,6 +142,10 @@ public class RemoteMcpToolCallProxyProcessor extends AbstractMcpResponseProcesso
             return Map.of();
         }
         return objectMapper.readValue(json, MAP_TYPE);
+    }
+
+    private boolean isResponse(Map<String, Object> event) {
+        return event.containsKey("id") && (event.containsKey("result") || event.containsKey("error"));
     }
 
     private String extractErrorMessage(String body, Object rpcError) {

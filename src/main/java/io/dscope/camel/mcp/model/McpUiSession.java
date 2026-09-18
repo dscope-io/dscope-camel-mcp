@@ -1,6 +1,8 @@
 package io.dscope.camel.mcp.model;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -87,6 +89,18 @@ public class McpUiSession {
 
     public void setModelContext(Object modelContext) {
         this.modelContext = modelContext;
+    }
+
+    public synchronized void updateModelContext(Object context, boolean merge) {
+        if (merge && modelContext instanceof Map<?, ?> existing && context instanceof Map<?, ?> updates) {
+            Map<String, Object> merged = new LinkedHashMap<>();
+            existing.forEach((key, value) -> merged.put(String.valueOf(key), value));
+            updates.forEach((key, value) -> merged.put(String.valueOf(key), value));
+            modelContext = Map.copyOf(merged);
+        } else {
+            modelContext = context;
+        }
+        touch();
     }
 
     /**
