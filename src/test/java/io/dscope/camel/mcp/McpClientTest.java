@@ -144,6 +144,36 @@ public class McpClientTest {
         }
     }
 
+    @Test
+    public void shouldSendModernMetadataAndMethodNameHeadersWhenConfigured() throws Exception {
+        AtomicReference<Map<String, Object>> seenHeaders = new AtomicReference<>();
+
+        try (CamelContext context = createContext(seenHeaders)) {
+            context.getGlobalOptions().put(
+                    McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION,
+                    McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION);
+            context.start();
+            ProducerTemplate template = context.createProducerTemplate();
+
+            Object resultObject = McpClient.callResult(
+                    template,
+                    MCP_ENDPOINT,
+                    "tools/call",
+                    Map.of("name", "lookup", "arguments", Map.of()));
+
+            assertTrue(resultObject instanceof Map<?, ?>);
+            Map<String, Object> headers = seenHeaders.get();
+            assertNotNull(headers);
+            assertEquals("2026-07-28", headers.get("MCP-Protocol-Version"));
+            assertEquals("tools/call", headers.get("Mcp-Method"));
+            assertEquals("lookup", headers.get("Mcp-Name"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> metadata = (Map<String, Object>) headers.get("MCP-Request-Meta");
+            assertEquals("2026-07-28", metadata.get("io.modelcontextprotocol/protocolVersion"));
+            assertEquals(Map.of(), metadata.get("io.modelcontextprotocol/clientCapabilities"));
+        }
+    }
+
     private CamelContext createContext() throws Exception {
         return createContext(new AtomicReference<>());
     }
@@ -162,7 +192,8 @@ public class McpClientTest {
                             headers.put("Accept", exchange.getMessage().getHeader("Accept"));
                             headers.put("Content-Type", exchange.getMessage().getHeader("Content-Type"));
                             headers.put("MCP-Protocol-Version", exchange.getMessage().getHeader("MCP-Protocol-Version"));
-                            seenHeaders.set(headers);
+                            headers.put("Mcp-Method", exchange.getMessage().getHeader("Mcp-Method"));
+                            headers.put("Mcp-Name", exchange.getMessage().getHeader("Mcp-Name"));
 
                             String requestJson = exchange.getMessage().getBody(String.class);
                             Map<String, Object> request = MAPPER.readValue(
@@ -173,6 +204,14 @@ public class McpClientTest {
 
                             String method = String.valueOf(request.get("method"));
                             Object id = request.get("id");
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> requestParams = (Map<String, Object>) request.get("params");
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> requestMeta = requestParams == null
+                                    ? Map.of()
+                                    : (Map<String, Object>) requestParams.getOrDefault("_meta", Map.of());
+                            headers.put("MCP-Request-Meta", requestMeta);
+                            seenHeaders.set(headers);
 
                             Map<String, Object> result = new LinkedHashMap<>();
                             result.put("method", method);

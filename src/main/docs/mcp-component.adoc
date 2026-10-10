@@ -71,6 +71,35 @@ The consumer sets the following exchange properties:
 * `mcp.jsonrpc.id` – The JSON-RPC request id
 * `mcp.tool.name` – The tool name (for `tools/call` requests)
 
+== Protocol Revision Support
+
+The artifact version (`1.5.0`) is independent of the MCP protocol revision. The
+component retains its legacy `2025-06-18` behavior by default. For Streamable HTTP
+clients, set the Camel global option `mcp.http.protocolVersion` or JVM system
+property `CamelMcpProtocolVersion` to `2026-07-28` to opt into the modern
+per-request protocol.
+
+Modern producer requests include `params._meta` with the protocol version and
+client capabilities, plus the required `MCP-Protocol-Version` and `Mcp-Method`
+headers. Requests to `tools/call`, `resources/read`, and `prompts/get` also send
+`Mcp-Name`; values requiring encoding use the MCP Base64 sentinel format.
+Modern consumer requests are checked for metadata/header consistency and
+unsupported versions return MCP error `-32022` with `supported` and `requested`
+versions. The consumer handles `server/discover` directly and advertises only the
+implemented `tools` and `resources` primitives. Its discovery response includes
+cache metadata. Built-in JSON-RPC response processors and JSON-RPC map responses
+from user routes include `resultType: "complete"` and server identity metadata.
+
+Initialization and `ping` remain available to legacy clients but are not exposed
+for `2026-07-28`. The modern protocol is currently supported only over
+Streamable HTTP; the component's WebSocket transport remains legacy. Multi
+round-trip input requests, `subscriptions/listen`, notification SSE streams,
+SSE response streams/cancellation, parameter-to-header mappings, and the
+optional MCP Events webhook extension are not implemented and are not
+advertised. Origin validation and MCP HTTP authorization must be enforced by
+the hosting environment. Existing Apps Bridge behavior is also not advertised
+as a modern protocol capability.
+
 == Examples
 
 === Producer – Call a Tool

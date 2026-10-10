@@ -28,11 +28,13 @@ public class WebMcpGatewaySupport {
     protected Map<String, Object> readRequest(Exchange exchange) throws IOException {
         Object body = exchange.getMessage().getBody();
         if (body instanceof Map<?, ?> map) {
-            return copyMap(map);
+            return captureProtocolMetadata(exchange, copyMap(map));
         }
         String text = exchange.getMessage().getBody(String.class);
         text = text == null ? "" : text.trim();
-        return text.isBlank() ? Map.of() : objectMapper.readValue(text, MAP_TYPE);
+        return text.isBlank()
+                ? Map.of()
+                : captureProtocolMetadata(exchange, objectMapper.readValue(text, MAP_TYPE));
     }
 
     protected Map<String, Object> mapValue(Object value) {
@@ -99,20 +101,36 @@ public class WebMcpGatewaySupport {
         if (defaultArguments != null) {
             defaultArguments.forEach(effectiveArguments::putIfAbsent);
         }
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("name", toolName);
+        params.put("arguments", effectiveArguments);
+        String resolvedProtocolVersion = protocolVersion == null || protocolVersion.isBlank()
+                ? DEFAULT_PROTOCOL_VERSION
+                : protocolVersion;
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(resolvedProtocolVersion)) {
+            params.put("_meta", Map.of(
+                    McpHttpValidatorProcessor.META_PROTOCOL_VERSION, resolvedProtocolVersion,
+                    McpHttpValidatorProcessor.META_CLIENT_CAPABILITIES, Map.of()));
+        }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("jsonrpc", "2.0");
         payload.put("id", UUID.randomUUID().toString());
         payload.put("method", "tools/call");
-        payload.put("params", Map.of("name", toolName, "arguments", effectiveArguments));
+        payload.put("params", params);
 
-        String resolvedProtocolVersion = protocolVersion == null || protocolVersion.isBlank() ? DEFAULT_PROTOCOL_VERSION : protocolVersion;
-        HttpRequest request = HttpRequest.newBuilder(remoteEndpoint)
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(remoteEndpoint)
             .timeout(Duration.ofSeconds(30))
             .header("Content-Type", "application/json")
             .header("Accept", "application/json, text/event-stream")
             .header("MCP-Protocol-Version", resolvedProtocolVersion)
-            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-            .build();
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)));
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(resolvedProtocolVersion)) {
+            requestBuilder
+                    .header("Mcp-Method", "tools/call")
+                    .header("Mcp-Name", McpHttpValidatorProcessor.encodeHeaderValue(toolName));
+        }
+        HttpRequest request = requestBuilder.build();
+        exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, resolvedProtocolVersion);
 
         HttpResponse<String> response;
         try {
@@ -146,10 +164,18 @@ public class WebMcpGatewaySupport {
     }
 
     protected void writeResult(Exchange exchange, Object id, Object result) {
-        writeJson(exchange, 200, Map.of(
-            "jsonrpc", "2.0",
-            "id", id == null ? "" : id,
-            "result", result == null ? Map.of() : result));
+        Object responseResult = result == null ? Map.of() : result;
+        if (McpProtocolSupport.isModernProtocol(exchange)) {
+            if (!(responseResult instanceof Map<?, ?> resultMap)) {
+                throw new IllegalArgumentException("Modern MCP result must be a JSON object");
+            }
+            responseResult = McpProtocolSupport.decorateResult(exchange, resultMap);
+        }
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("jsonrpc", "2.0");
+        envelope.put("id", id == null ? "" : id);
+        envelope.put("result", responseResult);
+        writeJson(exchange, 200, envelope);
     }
 
     protected void writeError(Exchange exchange, Object id, int code, String message, int httpStatus) {
@@ -204,5 +230,15 @@ public class WebMcpGatewaySupport {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Unable to write WebMCP response", ex);
         }
+    }
+
+    private Map<String, Object> captureProtocolMetadata(Exchange exchange, Map<String, Object> request) {
+        Object paramsValue = request.get("params");
+        if (paramsValue instanceof Map<?, ?> params
+                && params.get("_meta") instanceof Map<?, ?> meta
+                && meta.get(McpHttpValidatorProcessor.META_PROTOCOL_VERSION) instanceof String version) {
+            exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, version);
+        }
+        return request;
     }
 }

@@ -65,7 +65,20 @@ public class McpProducer extends DefaultProducer {
         req.setJsonrpc("2.0");
         req.setId(UUID.randomUUID().toString());
         req.setMethod(resolveMethod(exchange, cfg));
-        req.setParams(resolveParams(exchange));
+        Map<String, Object> params = resolveParams(exchange);
+        String protocolVersion = resolveProtocolVersion();
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)) {
+            Object currentMeta = params.get("_meta");
+            Map<String, Object> meta = currentMeta instanceof Map<?, ?> rawMeta
+                    ? copyMap(rawMeta)
+                    : new LinkedHashMap<>();
+            meta.put(McpHttpValidatorProcessor.META_PROTOCOL_VERSION, protocolVersion);
+            if (!(meta.get(McpHttpValidatorProcessor.META_CLIENT_CAPABILITIES) instanceof Map<?, ?>)) {
+                meta.put(McpHttpValidatorProcessor.META_CLIENT_CAPABILITIES, Map.of());
+            }
+            params.put("_meta", meta);
+        }
+        req.setParams(params);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Dispatching MCP request id={} method={} targetUri={} paramKeys={} params={}",
@@ -74,7 +87,7 @@ public class McpProducer extends DefaultProducer {
 
         McpResponse resp;
         try {
-            resp = dispatchByUriStructure(cfg.getUri(), req);
+            resp = dispatchByUriStructure(cfg.getUri(), req, protocolVersion);
         } catch (Exception e) {
             long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
             LOG.error("MCP request failed id={} method={} targetUri={} durationMs={}",
@@ -92,7 +105,7 @@ public class McpProducer extends DefaultProducer {
         exchange.getMessage().setBody(resp);
     }
 
-    private McpResponse dispatchByUriStructure(String targetUri, McpRequest req) throws Exception {
+    private McpResponse dispatchByUriStructure(String targetUri, McpRequest req, String protocolVersion) throws Exception {
         // Local Camel route dispatch: mcp:camel:<camel-endpoint>
         // Example: mcp:camel:direct:mcp-service?method=ping
         if (targetUri != null && targetUri.startsWith(LOCAL_URI_PREFIX)) {
@@ -117,7 +130,7 @@ public class McpProducer extends DefaultProducer {
             LOG.debug("Remote MCP request payload id={} method={} uri={} payload={}",
                     req.getId(), req.getMethod(), targetUri, previewText(json));
         }
-        Map<String, Object> transportHeaders = buildRemoteTransportHeaders();
+        Map<String, Object> transportHeaders = buildRemoteTransportHeaders(req, protocolVersion);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Remote MCP request headers id={} method={} uri={} headers={}",
                 req.getId(), req.getMethod(), targetUri, transportHeaders);
@@ -222,15 +235,31 @@ public class McpProducer extends DefaultProducer {
         return params;
     }
 
-    private Map<String, Object> buildRemoteTransportHeaders() {
+    private Map<String, Object> copyMap(Map<?, ?> source) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> copy.put(String.valueOf(key), value));
+        return copy;
+    }
+
+    private Map<String, Object> buildRemoteTransportHeaders(McpRequest request, String protocolVersion) {
         Map<String, Object> headers = new LinkedHashMap<>();
         headers.put(Exchange.HTTP_METHOD, "POST");
         headers.put("Accept", MCP_ACCEPT);
         headers.put("Content-Type", JSON_CONTENT_TYPE);
 
-        String protocolVersion = resolveProtocolVersion();
         if (protocolVersion != null && !protocolVersion.isBlank()) {
             headers.put("MCP-Protocol-Version", protocolVersion);
+        }
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)) {
+            headers.put("Mcp-Method", request.getMethod());
+            String name = switch (request.getMethod()) {
+                case "tools/call" -> String.valueOf(request.getParams().get("name"));
+                case "resources/read", "prompts/get" -> String.valueOf(request.getParams().get("uri"));
+                default -> null;
+            };
+            if (name != null && !"null".equals(name)) {
+                headers.put("Mcp-Name", McpHttpValidatorProcessor.encodeHeaderValue(name));
+            }
         }
         return headers;
     }

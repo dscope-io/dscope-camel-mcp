@@ -84,6 +84,50 @@ class McpConsumerTest {
     }
 
     @Test
+    void testModernServerDiscoverIsHandledByComponent() throws Exception {
+        context.addRoutes(new RouteBuilder() {
+            @Override
+            public void configure() {
+                from("mcp:http://localhost:9881/mcp")
+                    .process(exchange -> fail("server/discover must not be delegated to the user route"));
+            }
+        });
+
+        context.start();
+        TimeUnit.MILLISECONDS.sleep(500);
+
+        String request = """
+            {
+              "jsonrpc": "2.0",
+              "id": "discover-1",
+              "method": "server/discover",
+              "params": {
+                "_meta": {
+                  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                  "io.modelcontextprotocol/clientCapabilities": {}
+                }
+              }
+            }
+            """;
+        String response = template.requestBodyAndHeaders(
+                "http://localhost:9881/mcp",
+                request,
+                Map.of(
+                        "CamelHttpMethod", "POST",
+                        "Content-Type", "application/json",
+                        "Accept", "application/json, text/event-stream",
+                        "MCP-Protocol-Version", "2026-07-28",
+                        "Mcp-Method", "server/discover"),
+                String.class);
+
+        assertNotNull(response);
+        assertTrue(response.contains("\"resultType\":\"complete\""), response);
+        assertTrue(response.contains("\"2026-07-28\""), response);
+        assertTrue(response.contains("\"supportedVersions\""), response);
+        assertTrue(response.contains("\"io.modelcontextprotocol/serverInfo\""), response);
+    }
+
+    @Test
     void testWebSocketConsumerConfiguration() throws Exception {
         // Test that WebSocket consumer can be configured
         context.addRoutes(new RouteBuilder() {
