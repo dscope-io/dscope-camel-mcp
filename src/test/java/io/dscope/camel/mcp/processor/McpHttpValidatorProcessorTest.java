@@ -47,6 +47,21 @@ class McpHttpValidatorProcessorTest {
     }
 
     @Test
+    void preservesWhitespaceInBase64EncodedMcpNameWhenComparingWithRequestBody() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            String toolName = " lookup ";
+            exchange.getIn().setBody(modernRequest("2026-07-28", "tools/call", Map.of("name", toolName)));
+            setRequiredHeaders(exchange, "2026-07-28", "tools/call");
+            exchange.getIn().setHeader("Mcp-Name", McpHttpValidatorProcessor.encodeHeaderValue(toolName));
+
+            new McpHttpValidatorProcessor().process(exchange);
+
+            assertEquals("2026-07-28", exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION));
+        }
+    }
+
+    @Test
     void rejectsProtocolVersionHeaderMismatch() throws Exception {
         try (DefaultCamelContext context = new DefaultCamelContext()) {
             Exchange exchange = new DefaultExchange(context);
