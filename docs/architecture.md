@@ -32,11 +32,11 @@ The `McpConsumer` creates a server endpoint that listens for incoming MCP reques
 │  └──────────────┬───────────────┘                          │
 │                 ↓                                           │
 │  ┌──────────────────────────────┐                          │
-│  │  McpHttpValidatorProcessor   │  Check headers (HTTP)    │
+│  │  McpRateLimitProcessor       │  Apply rate limits       │
 │  └──────────────┬───────────────┘                          │
 │                 ↓                                           │
 │  ┌──────────────────────────────┐                          │
-│  │  McpRateLimitProcessor       │  Apply rate limits       │
+│  │  McpHttpValidatorProcessor   │  Check headers (HTTP)    │
 │  └──────────────┬───────────────┘                          │
 │                 ↓                                           │
 │  ┌──────────────────────────────┐                          │
@@ -259,8 +259,8 @@ from:
 
 Both transports share the same processor pipeline:
 1. `mcpRequestSizeGuard` - Validates request size limits
-2. `mcpHttpValidator` - Validates HTTP headers (Accept, Content-Type) for MCP Streamable HTTP transport (HTTP only)
-3. `mcpRateLimit` - Applies rate limiting
+2. `mcpRateLimit` - Applies rate limiting before either body parser, including for malformed requests
+3. `mcpHttpValidator` - Validates HTTP headers (Accept, Content-Type) and protocol metadata for MCP Streamable HTTP transport (HTTP only)
 4. `mcpJsonRpcEnvelope` - Parses JSON-RPC envelope, extracts method
 5. Choice block - Routes to method-specific processor
 6. Response serialization
@@ -302,4 +302,3 @@ src/main/resources/karavan/metadata/
 ## Extensibility
 
 Both the library and sample service reuse the same base classes (`AbstractMcpRequestProcessor`, `AbstractMcpResponseProcessor`) so you can plug in custom logic while keeping JSON-RPC framing consistent. These building blocks let you extend MCP coverage with your own processors while reusing the shared HTTP transport and JSON serialization.
-

@@ -126,7 +126,7 @@ public class MyMcpServer {
 }
 ```
 
-The consumer automatically provides: request size validation, HTTP header validation, rate limiting, JSON-RPC envelope parsing, and JSON response serialization.
+The consumer automatically provides: request size validation, rate limiting before body parsing, HTTP header and protocol metadata validation, JSON-RPC envelope parsing, and JSON response serialization.
 
 See `samples/mcp-consumer/` for a complete working example with three tools (echo, add, greet).
 
