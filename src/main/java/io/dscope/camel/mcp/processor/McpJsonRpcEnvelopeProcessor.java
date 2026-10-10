@@ -109,11 +109,22 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
                     type.name(), method, idValue, rawParams != null);
         }
 
-        Map<String, Object> params = asMap(payload.get("params"), "params");
+        Map<String, Object> params = Optional.ofNullable(asMap(payload.get("params"), "params"))
+                .orElseGet(Map::of);
+        Map<String, Object> meta = asMap(params.get("_meta"), "params._meta");
+        if (meta != null) {
+            Object protocolVersion = meta.get(McpHttpValidatorProcessor.META_PROTOCOL_VERSION);
+            if (protocolVersion instanceof String version && !version.isBlank()) {
+                exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION, version);
+                exchange.setProperty(McpHttpValidatorProcessor.EXCHANGE_IS_MODERN_PROTOCOL,
+                        McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(version));
+            }
+        }
 
         switch (method) {
             case "initialize" -> handleInitialize(exchange, params);
             case "ping" -> handlePing(exchange, params);
+            case "server/discover" -> handleServerDiscover(exchange, params);
             case "resources/list" -> handleResourcesList(exchange, params);
             case "resources/read" -> handleResourcesRead(exchange, params);
             case "resources/get" -> handleResourcesGet(exchange, params);
@@ -132,7 +143,7 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
                 } else if (method.startsWith("ui/notifications/")) {
                     handleUiNotification(exchange, method, params);
                 } else {
-                    throw new IllegalArgumentException("Unsupported MCP method: " + method);
+                    throw new McpProtocolException(-32601, "Unsupported MCP method: " + method, 404, Map.of());
                 }
             }
         }
@@ -143,6 +154,10 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
     }
 
     private void handlePing(Exchange exchange, Map<String, Object> params) {
+        exchange.getIn().setBody(params == null ? Map.of() : params);
+    }
+
+    private void handleServerDiscover(Exchange exchange, Map<String, Object> params) {
         exchange.getIn().setBody(params == null ? Map.of() : params);
     }
 

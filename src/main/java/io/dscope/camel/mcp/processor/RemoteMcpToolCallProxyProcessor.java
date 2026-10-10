@@ -49,15 +49,28 @@ public class RemoteMcpToolCallProxyProcessor extends AbstractMcpResponseProcesso
         payload.put("jsonrpc", "2.0");
         payload.put("id", UUID.randomUUID().toString());
         payload.put("method", "tools/call");
-        payload.put("params", Map.of("name", toolName, "arguments", arguments));
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("name", toolName);
+        params.put("arguments", arguments);
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)) {
+            params.put("_meta", Map.of(
+                    McpHttpValidatorProcessor.META_PROTOCOL_VERSION, protocolVersion,
+                    McpHttpValidatorProcessor.META_CLIENT_CAPABILITIES, Map.of()));
+        }
+        payload.put("params", params);
 
-        HttpRequest request = HttpRequest.newBuilder(remoteEndpoint)
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(remoteEndpoint)
             .timeout(Duration.ofSeconds(30))
             .header("Content-Type", "application/json")
             .header("Accept", "application/json, text/event-stream")
             .header("MCP-Protocol-Version", protocolVersion)
-            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-            .build();
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)));
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)) {
+            requestBuilder
+                    .header("Mcp-Method", "tools/call")
+                    .header("Mcp-Name", McpHttpValidatorProcessor.encodeHeaderValue(toolName));
+        }
+        HttpRequest request = requestBuilder.build();
 
         HttpResponse<String> response;
         try {
