@@ -223,7 +223,7 @@ public class McpProducer extends DefaultProducer {
     private Map<String, Object> resolveParams(Exchange exchange) {
         Object body = exchange.getIn().getBody();
         if (body == null) {
-            return Map.of();
+            return new LinkedHashMap<>();
         }
         if (!(body instanceof Map<?, ?> rawParams)) {
             throw new IllegalArgumentException(
@@ -254,7 +254,8 @@ public class McpProducer extends DefaultProducer {
             headers.put("Mcp-Method", request.getMethod());
             String name = switch (request.getMethod()) {
                 case "tools/call" -> String.valueOf(request.getParams().get("name"));
-                case "resources/read", "prompts/get" -> String.valueOf(request.getParams().get("uri"));
+                case "resources/read" -> String.valueOf(request.getParams().get("uri"));
+                case "prompts/get" -> String.valueOf(request.getParams().get("name"));
                 default -> null;
             };
             if (name != null && !"null".equals(name)) {

@@ -181,9 +181,9 @@ public class McpHttpValidatorProcessor implements Processor {
 
         String name = null;
         if ("tools/call".equals(method)) {
-            name = stringValue(params.get("name"));
+            name = identifierValue(params.get("name"));
         } else if ("resources/read".equals(method) || "prompts/get".equals(method)) {
-            name = stringValue(params.get("uri"));
+            name = identifierValue(params.get("uri"));
         }
         if (name != null) {
             String nameHeader = normalize(message.getHeader("Mcp-Name", String.class)).orElse(null);
@@ -239,6 +239,10 @@ public class McpHttpValidatorProcessor implements Processor {
 
     private String stringValue(Object value) {
         return value instanceof String text && !text.isBlank() ? text.trim() : null;
+    }
+
+    private String identifierValue(Object value) {
+        return value instanceof String text && !text.isBlank() ? text : null;
     }
 
     private Map<String, Object> objectValue(Object value) {

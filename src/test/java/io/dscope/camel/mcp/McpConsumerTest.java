@@ -239,6 +239,62 @@ class McpConsumerTest {
     }
 
     @Test
+    void testMalformedRequestsConsumeRateLimitTokens() throws Exception {
+        Map<String, String> originalProperties = new java.util.HashMap<>();
+        for (String key : new String[] {
+                "mcp.rate.enabled", "mcp.rate.bucketCapacity", "mcp.rate.refillPerSecond"}) {
+            originalProperties.put(key, System.getProperty(key));
+        }
+        try {
+            System.setProperty("mcp.rate.enabled", "true");
+            System.setProperty("mcp.rate.bucketCapacity", "2");
+            System.setProperty("mcp.rate.refillPerSecond", "0");
+            context.addRoutes(new RouteBuilder() {
+                @Override
+                public void configure() {
+                    from("mcp:http://localhost:9882/mcp")
+                        .process(exchange -> fail("Malformed or throttled requests must not reach the user route"));
+                }
+            });
+            context.start();
+
+            String[] requests = {
+                "{\"jsonrpc\":\"1.0\",\"id\":\"bad-envelope\",\"method\":\"ping\"}",
+                "{invalid-json",
+                "{invalid-json",
+                "{\"jsonrpc\":\"2.0\",\"id\":\"valid\",\"method\":\"ping\"}"
+            };
+            for (int i = 0; i < requests.length; i++) {
+                String request = requests[i];
+                Exchange response = template.request(
+                        "http://localhost:9882/mcp?throwExceptionOnFailure=false", exchange -> {
+                            exchange.getMessage().setBody(request);
+                            exchange.getMessage().setHeader("Content-Type", "application/json");
+                            exchange.getMessage().setHeader("Accept", "application/json, text/event-stream");
+                        });
+                assertEquals(400, response.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class));
+                String body = response.getMessage().getBody(String.class);
+                assertNotNull(body);
+                if (i == 0) {
+                    assertTrue(body.contains("Unsupported jsonrpc version: 1.0"), body);
+                } else if (i == 1) {
+                    assertTrue(body.contains("Unable to parse JSON-RPC request for HTTP validation"), body);
+                } else {
+                    assertTrue(body.contains("Rate limit exceeded"), body);
+                }
+            }
+        } finally {
+            originalProperties.forEach((key, value) -> {
+                if (value == null) {
+                    System.clearProperty(key);
+                } else {
+                    System.setProperty(key, value);
+                }
+            });
+        }
+    }
+
+    @Test
     void testConsumerStopsCleanly() throws Exception {
         context.addRoutes(new RouteBuilder() {
             @Override

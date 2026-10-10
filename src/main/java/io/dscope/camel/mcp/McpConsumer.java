@@ -26,7 +26,7 @@ import io.dscope.camel.mcp.processor.McpHttpValidatorProcessor;
  * Camel consumer-side implementation for MCP server calls.
  * <p>
  * It creates an Undertow HTTP/WebSocket listener, applies MCP pre-processing
- * (size guard, HTTP validation, rate limiting, JSON-RPC envelope parsing),
+ * (size guard, rate limiting, HTTP validation, JSON-RPC envelope parsing),
  * delegates to the route processor, and normalizes JSON responses.
  */
 public class McpConsumer extends DefaultConsumer {
@@ -85,12 +85,14 @@ public class McpConsumer extends DefaultConsumer {
                 // 1) Validate request size first to protect resources.
                 requestSizeGuard.process(exchange);
                 
+                // HTTP validation also parses the body, so charge requests before either parser.
+                rateLimit.process(exchange);
+
                 // 2) Validate HTTP metadata before dispatching the JSON-RPC request.
                 if (!config.isWebsocket()) {
                     httpValidator.process(exchange);
                 }
                 jsonRpcEnvelope.process(exchange);
-                rateLimit.process(exchange);
 
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Incoming MCP {} method={} id={}",

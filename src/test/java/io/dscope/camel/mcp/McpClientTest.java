@@ -174,6 +174,31 @@ public class McpClientTest {
         }
     }
 
+    @Test
+    public void shouldSendPromptNameHeaderForModernPromptsGet() throws Exception {
+        AtomicReference<Map<String, Object>> seenHeaders = new AtomicReference<>();
+
+        try (CamelContext context = createContext(seenHeaders)) {
+            context.getGlobalOptions().put(
+                    McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION,
+                    McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION);
+            context.start();
+            ProducerTemplate template = context.createProducerTemplate();
+
+            Object resultObject = McpClient.callResult(
+                    template,
+                    MCP_ENDPOINT,
+                    "prompts/get",
+                    Map.of("name", "greeting"));
+
+            assertTrue(resultObject instanceof Map<?, ?>);
+            Map<String, Object> headers = seenHeaders.get();
+            assertNotNull(headers);
+            assertEquals("prompts/get", headers.get("Mcp-Method"));
+            assertEquals("greeting", headers.get("Mcp-Name"));
+        }
+    }
+
     private CamelContext createContext() throws Exception {
         return createContext(new AtomicReference<>());
     }
