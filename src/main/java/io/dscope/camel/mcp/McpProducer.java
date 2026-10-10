@@ -173,7 +173,7 @@ public class McpProducer extends DefaultProducer {
     private Map<String, Object> resolveParams(Exchange exchange) {
         Object body = exchange.getIn().getBody();
         if (body == null) {
-            return Map.of();
+            return new LinkedHashMap<>();
         }
         if (!(body instanceof Map<?, ?> rawParams)) {
             throw new IllegalArgumentException(
