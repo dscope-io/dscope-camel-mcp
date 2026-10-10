@@ -23,9 +23,11 @@ public abstract class AbstractMcpResponseProcessor extends AbstractMcpProcessor 
     protected abstract void handleResponse(Exchange exchange) throws Exception;
 
     protected final void writeResult(Exchange exchange, Map<String, Object> result) {
+        Map<String, Object> responseResult = McpProtocolSupport.decorateResult(
+                exchange, result == null ? Map.of() : result);
         Map<String, Object> envelope = createEnvelopeSkeleton();
         envelope.put("id", getJsonRpcId(exchange));
-        envelope.put("result", result == null ? Map.of() : result);
+        envelope.put("result", responseResult);
         writeJson(exchange, envelope);
         applyJsonResponseHeaders(exchange, 200);
     }
