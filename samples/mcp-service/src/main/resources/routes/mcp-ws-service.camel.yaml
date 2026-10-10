@@ -172,14 +172,8 @@
 - route:
     id: mcp-service-ws-notifications
     from:
-      uri: "undertow:http://127.0.0.1:8090/mcp/notifications?httpMethodRestrict=POST&muteException=true&maxEntitySize=32768"
+      uri: "direct:mcp-server-notifications"
       steps:
-        - process:
-            ref: mcpRequestSizeGuard
-        - process:
-            ref: mcpHttpValidator
-        - process:
-            ref: mcpRateLimit
         - convertBodyTo:
             type: java.lang.String
         - log:
@@ -189,8 +183,3 @@
             name: CamelWebSocketSendToAll
             constant: "true"
         - to: "undertow:ws://127.0.0.1:8090/mcp"
-        - setHeader:
-            name: CamelHttpResponseCode
-            constant: "202"
-        - setBody:
-            constant: ""

@@ -3,6 +3,8 @@ package io.dscope.camel.mcp.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.dscope.camel.mcp.service.McpUiSessionRegistry;
+
 /**
  * Configuration properties for MCP Apps Bridge.
  * 
@@ -15,9 +17,13 @@ public class McpAppsConfiguration {
 
     public static final long DEFAULT_SESSION_TIMEOUT_MS = 3600000L; // 1 hour
     public static final boolean DEFAULT_ENABLED = true;
+    public static final int DEFAULT_CONTEXT_MAX_BYTES = McpUiSessionRegistry.DEFAULT_CONTEXT_MAX_BYTES;
+    public static final int DEFAULT_CONTEXT_MAX_ENTRIES = McpUiSessionRegistry.DEFAULT_CONTEXT_MAX_ENTRIES;
 
     private boolean enabled = DEFAULT_ENABLED;
     private long sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS;
+    private int contextMaxBytes = DEFAULT_CONTEXT_MAX_BYTES;
+    private int contextMaxEntries = DEFAULT_CONTEXT_MAX_ENTRIES;
     private String hostName = "camel-mcp";
     private String hostVersion = "1.5.0";
 
@@ -31,7 +37,9 @@ public class McpAppsConfiguration {
      * - mcp.apps.enabled (boolean, default: true)
      * - mcp.apps.session.timeout (long milliseconds, default: 3600000)
      * - mcp.apps.host.name (string, default: camel-mcp)
-    * - mcp.apps.host.version (string, default: 1.5.0)
+     * - mcp.apps.context.maxBytes (integer, default: 262144)
+     * - mcp.apps.context.maxEntries (integer, default: 512)
+     * - mcp.apps.host.version (string, default: 1.5.0)
      * 
      * @return configuration instance
      */
@@ -52,6 +60,11 @@ public class McpAppsConfiguration {
                         timeoutProp, DEFAULT_SESSION_TIMEOUT_MS);
             }
         }
+
+        config.contextMaxBytes = positiveIntProperty(
+                "mcp.apps.context.maxBytes", DEFAULT_CONTEXT_MAX_BYTES);
+        config.contextMaxEntries = positiveIntProperty(
+                "mcp.apps.context.maxEntries", DEFAULT_CONTEXT_MAX_ENTRIES);
         
         String hostNameProp = System.getProperty("mcp.apps.host.name");
         if (hostNameProp != null && !hostNameProp.isBlank()) {
@@ -64,6 +77,23 @@ public class McpAppsConfiguration {
         }
         
         return config;
+    }
+
+    private static int positiveIntProperty(String name, int defaultValue) {
+        String value = System.getProperty(name);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed > 0) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+            // Fall through to the warning and default below.
+        }
+        LOG.warn("Invalid {} value '{}'; using default {}", name, value, defaultValue);
+        return defaultValue;
     }
 
     /**
@@ -91,6 +121,22 @@ public class McpAppsConfiguration {
 
     public void setSessionTimeoutMs(long sessionTimeoutMs) {
         this.sessionTimeoutMs = sessionTimeoutMs;
+    }
+
+    public int getContextMaxBytes() {
+        return contextMaxBytes;
+    }
+
+    public void setContextMaxBytes(int contextMaxBytes) {
+        this.contextMaxBytes = contextMaxBytes;
+    }
+
+    public int getContextMaxEntries() {
+        return contextMaxEntries;
+    }
+
+    public void setContextMaxEntries(int contextMaxEntries) {
+        this.contextMaxEntries = contextMaxEntries;
     }
 
     /**

@@ -321,20 +321,22 @@
         
         function renderNav() {
             const nav = document.getElementById('tool-nav');
+            nav.replaceChildren();
             if (!CONFIG.showNav || tools.length <= 1) {
                 nav.style.display = 'none';
                 return;
             }
-            
-            nav.innerHTML = tools.map(tool => 
-                `<button data-tool="${escapeHtml(tool.name)}" ${selectedTool?.name === tool.name ? 'class="active"' : ''}>${escapeHtml(tool.title || tool.name)}</button>`
-            ).join('');
-            
-            nav.querySelectorAll('button').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tool = tools.find(t => t.name === btn.dataset.tool);
-                    if (tool) selectTool(tool);
-                });
+            nav.style.display = '';
+
+            tools.forEach(tool => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = String(tool.title || tool.name || '');
+                if (selectedTool?.name === tool.name) {
+                    button.classList.add('active');
+                }
+                button.addEventListener('click', () => selectTool(tool));
+                nav.appendChild(button);
             });
         }
         
@@ -351,62 +353,95 @@
             const properties = schema.properties || {};
             const required = schema.required || [];
             
-            let html = `<form id="tool-form" class="card">
-                <h2>${escapeHtml(tool.title || tool.name)}</h2>
-                <p class="description">${escapeHtml(tool.description || '')}</p>`;
-            
+            const form = document.createElement('form');
+            form.id = 'tool-form';
+            form.className = 'card';
+
+            const heading = document.createElement('h2');
+            heading.textContent = String(tool.title || tool.name || '');
+            form.appendChild(heading);
+
+            const description = document.createElement('p');
+            description.className = 'description';
+            description.textContent = String(tool.description || '');
+            form.appendChild(description);
+
             for (const [name, prop] of Object.entries(properties)) {
                 const isRequired = required.includes(name);
-                html += renderField(name, prop, isRequired);
+                form.appendChild(renderField(name, prop, isRequired));
             }
-            
-            html += `<button type="submit" class="btn btn-primary">Execute</button>
-            </form>`;
-            
-            container.innerHTML = html;
-            
-            document.getElementById('tool-form').addEventListener('submit', async (e) => {
+
+            const submit = document.createElement('button');
+            submit.type = 'submit';
+            submit.className = 'btn btn-primary';
+            submit.textContent = 'Execute';
+            form.appendChild(submit);
+
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await executeTool(tool.name);
             });
+            container.replaceChildren(form);
         }
         
         function renderField(name, prop, required) {
             const label = prop.title || name;
             const type = mapSchemaType(prop);
             const reqMark = required ? ' *' : '';
-            
+            const group = document.createElement('div');
+            group.className = 'form-group';
+
             if (prop.enum) {
-                return `<div class="form-group">
-                    <label>${escapeHtml(label)}${reqMark}</label>
-                    <select name="${escapeHtml(name)}" ${required ? 'required' : ''}>
-                        <option value="">Select...</option>
-                        ${prop.enum.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('')}
-                    </select>
-                </div>`;
+                group.appendChild(createLabel(String(label) + reqMark));
+                const select = document.createElement('select');
+                select.name = String(name);
+                select.required = required;
+                select.add(new Option('Select...', ''));
+                prop.enum.forEach(value => {
+                    const text = String(value);
+                    select.add(new Option(text, text));
+                });
+                group.appendChild(select);
+                return group;
             }
-            
+
             if (prop.type === 'boolean') {
-                return `<div class="form-group">
-                    <label><input type="checkbox" name="${escapeHtml(name)}"> ${escapeHtml(label)}</label>
-                </div>`;
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = String(name);
+                const checkboxLabel = createLabel(' ' + String(label));
+                checkboxLabel.prepend(checkbox);
+                group.appendChild(checkboxLabel);
+                return group;
             }
-            
+
             if (prop.type === 'array' || prop.type === 'object') {
-                return `<div class="form-group">
-                    <label>${escapeHtml(label)}${reqMark} (JSON)</label>
-                    <textarea name="${escapeHtml(name)}" placeholder="${escapeHtml(prop.description || 'Enter JSON...')}"
-                        ${required ? 'required' : ''}></textarea>
-                </div>`;
+                group.appendChild(createLabel(String(label) + reqMark + ' (JSON)'));
+                const textarea = document.createElement('textarea');
+                textarea.name = String(name);
+                textarea.placeholder = String(prop.description || 'Enter JSON...');
+                textarea.required = required;
+                group.appendChild(textarea);
+                return group;
             }
-            
-            return `<div class="form-group">
-                <label>${escapeHtml(label)}${reqMark}</label>
-                <input type="${type}" name="${escapeHtml(name)}"
-                       placeholder="${escapeHtml(prop.description || '')}"
-                       ${prop.default !== undefined ? `value="${escapeHtml(prop.default)}"` : ''}
-                       ${required ? 'required' : ''}>
-            </div>`;
+
+            group.appendChild(createLabel(String(label) + reqMark));
+            const input = document.createElement('input');
+            input.type = type;
+            input.name = String(name);
+            input.placeholder = String(prop.description || '');
+            input.required = required;
+            if (prop.default !== undefined) {
+                input.value = String(prop.default);
+            }
+            group.appendChild(input);
+            return group;
+        }
+
+        function createLabel(text) {
+            const label = document.createElement('label');
+            label.appendChild(document.createTextNode(text));
+            return label;
         }
         
         function mapSchemaType(prop) {
@@ -472,47 +507,55 @@
         
         function showLoading() {
             const container = document.getElementById('result-container');
-            container.innerHTML = `<div class="loading">
-                <div class="spinner"></div>
-                <span>Executing...</span>
-            </div>`;
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner';
+            const message = document.createElement('span');
+            message.textContent = 'Executing...';
+            loading.append(spinner, message);
+            container.replaceChildren(loading);
         }
         
         function showResult(result) {
             const container = document.getElementById('result-container');
             const json = JSON.stringify(result, null, 2);
-            container.innerHTML = `<div class="result success">
-                <pre>${escapeHtml(json)}</pre>
-            </div>`;
+            showResultContent(container, 'success', json);
         }
         
         function showError(message) {
             const container = document.getElementById('result-container');
-            container.innerHTML = `<div class="result error">
-                <pre>${escapeHtml(message)}</pre>
-            </div>`;
+            showResultContent(container, 'error', message);
+        }
+
+        function showResultContent(container, status, content) {
+            const result = document.createElement('div');
+            result.className = 'result ' + status;
+            const pre = document.createElement('pre');
+            pre.textContent = String(content);
+            result.appendChild(pre);
+            container.replaceChildren(result);
         }
         
         function clearResult() {
-            document.getElementById('result-container').innerHTML = '';
+            document.getElementById('result-container').replaceChildren();
         }
         
         function showEmptyState() {
             const container = document.getElementById('tool-container');
-            container.innerHTML = `<div class="empty-state">
-                <p>No tools available</p>
-            </div>`;
-        }
-        
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty-state';
+            const message = document.createElement('p');
+            message.textContent = 'No tools available';
+            emptyState.appendChild(message);
+            container.replaceChildren(emptyState);
         }
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('header').innerHTML = `<h1>${escapeHtml(CONFIG.title)}</h1>`;
+            const heading = document.createElement('h1');
+            heading.textContent = CONFIG.title;
+            document.getElementById('header').replaceChildren(heading);
             loadTools();
         });
     })();

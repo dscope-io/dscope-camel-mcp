@@ -1,12 +1,18 @@
 package io.dscope.camel.mcp.service;
 
 import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -149,5 +155,61 @@ class McpUiSessionRegistryTest {
     void shouldReturnDefaultTimeout() {
         McpUiSessionRegistry defaultRegistry = new McpUiSessionRegistry();
         assertEquals(McpUiSessionRegistry.DEFAULT_SESSION_TIMEOUT_MS, defaultRegistry.getSessionTimeoutMs());
+        assertEquals(McpUiSessionRegistry.DEFAULT_CONTEXT_MAX_BYTES, defaultRegistry.getContextMaxBytes());
+        assertEquals(McpUiSessionRegistry.DEFAULT_CONTEXT_MAX_ENTRIES, defaultRegistry.getContextMaxEntries());
+    }
+
+    @Test
+    void shouldKeepConcurrentMergesWithinEntryLimit() throws Exception {
+        McpUiSessionRegistry limitedRegistry = new McpUiSessionRegistry(60_000L, 1024, 1);
+        McpUiSession session = limitedRegistry.register("ui://test.com/app");
+        session.setModelContext(Map.of());
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> first = executor.submit(() -> mergeAfter(start, session, "first"));
+            Future<Boolean> second = executor.submit(() -> mergeAfter(start, session, "second"));
+            start.countDown();
+
+            int successfulUpdates = (first.get() ? 1 : 0) + (second.get() ? 1 : 0);
+            assertEquals(1, successfulUpdates);
+            assertEquals(1, ((Map<?, ?>) session.getModelContext()).size());
+        }
+    }
+
+    @Test
+    void shouldApplyLimitsToDirectContextSetter() {
+        McpUiSessionRegistry limitedRegistry = new McpUiSessionRegistry(60_000L, 16, 1);
+        McpUiSession session = limitedRegistry.register("ui://test.com/app");
+
+        assertThrows(McpUiSession.ContextValidationException.class,
+                () -> session.setModelContext(Map.of("large", "x".repeat(32))));
+        assertEquals(null, session.getModelContext());
+    }
+
+    @Test
+    void shouldPreventNestedMutationAfterValidation() {
+        McpUiSession session = registry.register("ui://test.com/app");
+        session.setModelContext(Map.of("nested", Map.of("items", java.util.List.of("value"))));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) session.getModelContext();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> nested = (Map<String, Object>) context.get("nested");
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> items = (java.util.List<Object>) nested.get("items");
+
+        assertThrows(UnsupportedOperationException.class, () -> nested.put("bypass", "value"));
+        assertThrows(UnsupportedOperationException.class, () -> items.add("bypass"));
+    }
+
+    private static boolean mergeAfter(CountDownLatch start, McpUiSession session, String key) throws Exception {
+        start.await();
+        try {
+            session.updateModelContext(Map.of(key, "value"), true);
+            return true;
+        } catch (McpUiSession.ContextValidationException expected) {
+            return false;
+        }
     }
 }

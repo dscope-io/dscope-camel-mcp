@@ -22,7 +22,6 @@ public class McpOpenApiBuilder {
     private String version = "1.0.0";
     private String description = "OpenAPI definition for the Camel MCP HTTP facade.";
     private final List<ServerEntry> servers = new ArrayList<>();
-    private boolean includeWebSocketHelpers = true;
 
     public McpOpenApiBuilder withTitle(String value) {
         this.title = requireNonBlank(value, "title");
@@ -44,8 +43,14 @@ public class McpOpenApiBuilder {
         return this;
     }
 
+    /**
+     * Retained for source compatibility. Server notifications are now published
+     * through an in-process Camel endpoint and are not part of the HTTP API.
+     *
+     * @deprecated this option no longer changes the generated specification
+     */
+    @Deprecated
     public McpOpenApiBuilder includeWebSocketHelpers(boolean enabled) {
-        this.includeWebSocketHelpers = enabled;
         return this;
     }
 
@@ -69,9 +74,6 @@ public class McpOpenApiBuilder {
         appendHttpPath(yaml);
         appendStreamPath(yaml);
         appendHealthPath(yaml);
-        if (includeWebSocketHelpers) {
-            appendNotificationPath(yaml);
-        }
         appendComponents(yaml);
         return yaml.toString();
     }
@@ -86,12 +88,12 @@ public class McpOpenApiBuilder {
             String yaml = buildYaml();
             Files.writeString(outputPath, yaml);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Wrote MCP OpenAPI spec path={} bytes={} includeWebSocketHelpers={} servers={} version={}",
-                        outputPath, yaml.length(), includeWebSocketHelpers, servers.size(), version);
+                LOG.debug("Wrote MCP OpenAPI spec path={} bytes={} servers={} version={}",
+                        outputPath, yaml.length(), servers.size(), version);
             }
         } catch (IOException e) {
-            LOG.error("Unable to write OpenAPI spec path={} includeWebSocketHelpers={} servers={} version={}",
-                    outputPath, includeWebSocketHelpers, servers.size(), version, e);
+            LOG.error("Unable to write OpenAPI spec path={} servers={} version={}",
+                    outputPath, servers.size(), version, e);
             throw new UncheckedIOException("Unable to write OpenAPI spec to " + outputPath, e);
         }
     }
@@ -154,22 +156,6 @@ public class McpOpenApiBuilder {
         yaml.append("            application/json:\n");
         yaml.append("              schema:\n");
         yaml.append("                $ref: '#/components/schemas/HealthStatus'\n");
-    }
-
-    private void appendNotificationPath(StringBuilder yaml) {
-        yaml.append("  /mcp/notifications:\n");
-        yaml.append("    post:\n");
-        yaml.append("      summary: Broadcast a server initiated notification\n");
-        yaml.append("      operationId: postMcpNotifications\n");
-        yaml.append("      requestBody:\n");
-        yaml.append("        required: true\n");
-        yaml.append("        content:\n");
-        yaml.append("          application/json:\n");
-        yaml.append("            schema:\n");
-        yaml.append("              $ref: '#/components/schemas/JsonRpcRequest'\n");
-        yaml.append("      responses:\n");
-        yaml.append("        '202':\n");
-        yaml.append("          description: Notification accepted for delivery\n");
     }
 
     private void appendComponents(StringBuilder yaml) {

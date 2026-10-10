@@ -1,10 +1,16 @@
 package io.dscope.camel.mcp.model;
 
+import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Represents an active MCP Apps UI session.
@@ -14,17 +20,25 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class McpUiSession {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    public static final int DEFAULT_CONTEXT_MAX_BYTES = 256 * 1024;
+    public static final int DEFAULT_CONTEXT_MAX_ENTRIES = 512;
+
     private final String sessionId;
     private final String resourceUri;
     private final Instant createdAt;
     private volatile Instant lastActivityAt;
     private volatile String toolName;
     private volatile Object modelContext;
+    private final int contextMaxBytes;
+    private final int contextMaxEntries;
     private final AtomicReference<Object> transport = new AtomicReference<>();
 
-    private McpUiSession(String sessionId, String resourceUri) {
+    private McpUiSession(String sessionId, String resourceUri, int contextMaxBytes, int contextMaxEntries) {
         this.sessionId = sessionId;
         this.resourceUri = resourceUri;
+        this.contextMaxBytes = contextMaxBytes;
+        this.contextMaxEntries = contextMaxEntries;
         this.createdAt = Instant.now();
         this.lastActivityAt = Instant.now();
     }
@@ -36,7 +50,8 @@ public class McpUiSession {
      * @return a new session with a unique identifier
      */
     public static McpUiSession create(String resourceUri) {
-        return new McpUiSession(UUID.randomUUID().toString(), resourceUri);
+        return create(resourceUri, null,
+                DEFAULT_CONTEXT_MAX_BYTES, DEFAULT_CONTEXT_MAX_ENTRIES);
     }
 
     /**
@@ -47,7 +62,17 @@ public class McpUiSession {
      * @return a new session with a unique identifier
      */
     public static McpUiSession create(String resourceUri, String toolName) {
-        McpUiSession session = create(resourceUri);
+        return create(resourceUri, toolName,
+                DEFAULT_CONTEXT_MAX_BYTES, DEFAULT_CONTEXT_MAX_ENTRIES);
+    }
+
+    /**
+     * Creates a new UI session with explicit model-context limits.
+     */
+    public static McpUiSession create(String resourceUri, String toolName,
+            int contextMaxBytes, int contextMaxEntries) {
+        McpUiSession session = new McpUiSession(UUID.randomUUID().toString(), resourceUri,
+                contextMaxBytes, contextMaxEntries);
         session.toolName = toolName;
         return session;
     }
@@ -87,20 +112,70 @@ public class McpUiSession {
         return modelContext;
     }
 
-    public void setModelContext(Object modelContext) {
-        this.modelContext = modelContext;
+    public synchronized void setModelContext(Object modelContext) {
+        updateModelContext(modelContext, false);
     }
 
     public synchronized void updateModelContext(Object context, boolean merge) {
+        Object candidate;
         if (merge && modelContext instanceof Map<?, ?> existing && context instanceof Map<?, ?> updates) {
             Map<String, Object> merged = new LinkedHashMap<>();
             existing.forEach((key, value) -> merged.put(String.valueOf(key), value));
             updates.forEach((key, value) -> merged.put(String.valueOf(key), value));
-            modelContext = Map.copyOf(merged);
+            candidate = merged;
         } else {
-            modelContext = context;
+            candidate = context;
         }
+
+        modelContext = normalizeAndValidate(candidate);
         touch();
+    }
+
+    private Object normalizeAndValidate(Object candidate) {
+        try {
+            byte[] serialized = OBJECT_MAPPER.writeValueAsBytes(candidate);
+            if (serialized.length > contextMaxBytes) {
+                throw new ContextValidationException(
+                        "Model context exceeds the maximum serialized size of " + contextMaxBytes + " bytes");
+            }
+            Object normalized = OBJECT_MAPPER.readValue(serialized, Object.class);
+            if (normalized instanceof Map<?, ?> map) {
+                if (map.size() > contextMaxEntries) {
+                    throw new ContextValidationException(
+                            "Model context exceeds the maximum of " + contextMaxEntries + " top-level entries");
+                }
+            }
+            return immutableJsonValue(normalized);
+        } catch (IOException | IllegalArgumentException e) {
+            if (e instanceof ContextValidationException validationException) {
+                throw validationException;
+            }
+            throw new ContextValidationException("Model context must be JSON serializable", e);
+        }
+    }
+
+    private Object immutableJsonValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> immutable = new LinkedHashMap<>();
+            map.forEach((key, nested) -> immutable.put(String.valueOf(key), immutableJsonValue(nested)));
+            return Collections.unmodifiableMap(immutable);
+        }
+        if (value instanceof List<?> list) {
+            List<Object> immutable = new ArrayList<>(list.size());
+            list.forEach(nested -> immutable.add(immutableJsonValue(nested)));
+            return Collections.unmodifiableList(immutable);
+        }
+        return value;
+    }
+
+    public static final class ContextValidationException extends IllegalArgumentException {
+        public ContextValidationException(String message) {
+            super(message);
+        }
+
+        public ContextValidationException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /**

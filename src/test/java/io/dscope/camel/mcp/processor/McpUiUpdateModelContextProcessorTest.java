@@ -2,12 +2,14 @@ package io.dscope.camel.mcp.processor;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.time.Instant;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.apache.camel.support.DefaultExchange;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -136,6 +138,61 @@ class McpUiUpdateModelContextProcessorTest {
             Map<String, Object> envelope = MAPPER.readValue(body, Map.class);
             
             assertNotNull(envelope.get("error"));
+        }
+    }
+
+    @Test
+    void shouldRejectMergeAboveEntryLimitWithoutChangingStateOrActivity() throws Exception {
+        McpUiSessionRegistry registry = new McpUiSessionRegistry(60_000L, 1024, 1);
+        McpUiSession session = registry.register("ui://test.com/app");
+        session.setModelContext(Map.of("kept", "value"));
+        Object originalContext = session.getModelContext();
+        Instant originalActivity = session.getLastActivityAt();
+
+        McpUiUpdateModelContextProcessor processor = new McpUiUpdateModelContextProcessor(registry);
+        try (DefaultCamelContext ctx = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(ctx);
+            exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID, "ctx-limit-entries");
+            exchange.setProperty(McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID, session.getSessionId());
+            exchange.getIn().setBody(Map.of(
+                    "context", Map.of("added", "value"),
+                    "operation", "merge"));
+
+            processor.process(exchange);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> envelope = MAPPER.readValue(exchange.getIn().getBody(String.class), Map.class);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> error = (Map<String, Object>) envelope.get("error");
+            assertEquals(-32602, error.get("code"));
+            assertEquals(400, exchange.getIn().getHeader(Exchange.HTTP_RESPONSE_CODE));
+            assertSame(originalContext, session.getModelContext());
+            assertEquals(originalActivity, session.getLastActivityAt());
+        }
+    }
+
+    @Test
+    void shouldRejectReplaceAboveByteLimitWithoutChangingStateOrActivity() throws Exception {
+        McpUiSessionRegistry registry = new McpUiSessionRegistry(60_000L, 32, 10);
+        McpUiSession session = registry.register("ui://test.com/app");
+        session.setModelContext(Map.of("kept", "value"));
+        Object originalContext = session.getModelContext();
+        Instant originalActivity = session.getLastActivityAt();
+
+        McpUiUpdateModelContextProcessor processor = new McpUiUpdateModelContextProcessor(registry);
+        try (DefaultCamelContext ctx = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(ctx);
+            exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID, "ctx-limit-bytes");
+            exchange.setProperty(McpUiInitializeProcessor.EXCHANGE_PROPERTY_UI_SESSION_ID, session.getSessionId());
+            exchange.getIn().setBody(Map.of(
+                    "context", Map.of("large", "x".repeat(64)),
+                    "operation", "replace"));
+
+            processor.process(exchange);
+
+            assertEquals(400, exchange.getIn().getHeader(Exchange.HTTP_RESPONSE_CODE));
+            assertSame(originalContext, session.getModelContext());
+            assertEquals(originalActivity, session.getLastActivityAt());
         }
     }
 }

@@ -2,6 +2,8 @@
 
 This sample hosts both HTTP and WebSocket MCP services using the Camel MCP component. The HTTP route binds processors to Undertow HTTP endpoints; the WebSocket route reuses them over Undertow's WS support. Both flows expose the MCP JSON-RPC methods: `initialize`, `ping`, `resources/list`, `resources/get`, `tools/list`, `tools/call`, plus notifications (e.g. `notifications/initialized`). Tool metadata is loaded from `src/main/resources/mcp/methods.yaml` and resource metadata from `src/main/resources/mcp/resources.yaml`.
 
+Server-initiated WebSocket notifications are published from trusted application routes to `direct:mcp-server-notifications`. The sample does not expose an HTTP broadcast endpoint.
+
 ## Prerequisites
 
 - Java 21+

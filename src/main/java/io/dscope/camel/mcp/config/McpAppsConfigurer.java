@@ -44,10 +44,13 @@ public class McpAppsConfigurer {
             return;
         }
 
-        LOG.info("Configuring MCP Apps Bridge with session timeout={}ms", configuration.getSessionTimeoutMs());
+        LOG.info("Configuring MCP Apps Bridge with session timeout={}ms, context maxBytes={}, maxEntries={}",
+                configuration.getSessionTimeoutMs(), configuration.getContextMaxBytes(),
+                configuration.getContextMaxEntries());
 
         // Create shared session registry
-        sessionRegistry = new McpUiSessionRegistry(configuration.getSessionTimeoutMs());
+        sessionRegistry = new McpUiSessionRegistry(configuration.getSessionTimeoutMs(),
+                configuration.getContextMaxBytes(), configuration.getContextMaxEntries());
         sessionRegistry.start();
 
         // Create processors with shared registry

@@ -59,7 +59,12 @@ public class McpUiUpdateModelContextProcessor extends AbstractMcpResponseProcess
         }
 
         // Update session with new context
-        session.updateModelContext(context, "merge".equalsIgnoreCase(operation));
+        try {
+            session.updateModelContext(context, "merge".equalsIgnoreCase(operation));
+        } catch (McpUiSession.ContextValidationException e) {
+            writeError(exchange, createError(-32602, e.getMessage()), 400);
+            return;
+        }
 
         // Store on exchange for downstream processing
         exchange.setProperty(EXCHANGE_PROPERTY_UI_MODEL_CONTEXT, context);
@@ -96,7 +101,7 @@ public class McpUiUpdateModelContextProcessor extends AbstractMcpResponseProcess
             return null;
         }
 
-        return sessionRegistry.getAndTouch(sessionId).orElseGet(() -> {
+        return sessionRegistry.get(sessionId).orElseGet(() -> {
             writeError(exchange, createError(-32001, "Invalid or expired session: " + sessionId), 401);
             return null;
         });

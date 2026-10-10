@@ -26,19 +26,29 @@ public class McpUiSessionRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(McpUiSessionRegistry.class);
 
     public static final long DEFAULT_SESSION_TIMEOUT_MS = 3600000L; // 1 hour
+    public static final int DEFAULT_CONTEXT_MAX_BYTES = McpUiSession.DEFAULT_CONTEXT_MAX_BYTES;
+    public static final int DEFAULT_CONTEXT_MAX_ENTRIES = McpUiSession.DEFAULT_CONTEXT_MAX_ENTRIES;
     private static final long CLEANUP_INTERVAL_MS = 60000L; // 1 minute
 
     private final Map<String, McpUiSession> sessions = new ConcurrentHashMap<>();
     private final long sessionTimeoutMs;
+    private final int contextMaxBytes;
+    private final int contextMaxEntries;
     private ScheduledExecutorService cleanupExecutor;
     private volatile boolean running = false;
 
     public McpUiSessionRegistry() {
-        this(DEFAULT_SESSION_TIMEOUT_MS);
+        this(DEFAULT_SESSION_TIMEOUT_MS, DEFAULT_CONTEXT_MAX_BYTES, DEFAULT_CONTEXT_MAX_ENTRIES);
     }
 
     public McpUiSessionRegistry(long sessionTimeoutMs) {
+        this(sessionTimeoutMs, DEFAULT_CONTEXT_MAX_BYTES, DEFAULT_CONTEXT_MAX_ENTRIES);
+    }
+
+    public McpUiSessionRegistry(long sessionTimeoutMs, int contextMaxBytes, int contextMaxEntries) {
         this.sessionTimeoutMs = sessionTimeoutMs > 0 ? sessionTimeoutMs : DEFAULT_SESSION_TIMEOUT_MS;
+        this.contextMaxBytes = contextMaxBytes > 0 ? contextMaxBytes : DEFAULT_CONTEXT_MAX_BYTES;
+        this.contextMaxEntries = contextMaxEntries > 0 ? contextMaxEntries : DEFAULT_CONTEXT_MAX_ENTRIES;
         this.cleanupExecutor = newCleanupExecutor();
     }
 
@@ -99,7 +109,7 @@ public class McpUiSessionRegistry {
      * @return the newly created session
      */
     public McpUiSession register(String resourceUri, String toolName) {
-        McpUiSession session = McpUiSession.create(resourceUri, toolName);
+        McpUiSession session = McpUiSession.create(resourceUri, toolName, contextMaxBytes, contextMaxEntries);
         sessions.put(session.getSessionId(), session);
         LOG.debug("Registered UI session id={} resourceUri={} toolName={}",
                 session.getSessionId(), resourceUri, toolName);
@@ -274,6 +284,14 @@ public class McpUiSessionRegistry {
      */
     public long getSessionTimeoutMs() {
         return sessionTimeoutMs;
+    }
+
+    public int getContextMaxBytes() {
+        return contextMaxBytes;
+    }
+
+    public int getContextMaxEntries() {
+        return contextMaxEntries;
     }
 
     private ScheduledExecutorService newCleanupExecutor() {
