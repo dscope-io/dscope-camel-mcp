@@ -13,6 +13,38 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class McpHttpValidatorProcessorTest {
 
     @Test
+    void validatesLocalOriginsAsUrisAndPreservesLocalPortSupport() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            exchange.getIn().setBody(modernRequest("2026-07-28", "server/discover", Map.of()));
+            setRequiredHeaders(exchange, "2026-07-28", "server/discover");
+            McpHttpValidatorProcessor validator = new McpHttpValidatorProcessor("http://localhost");
+            exchange.getIn().setHeader("Origin", "http://localhost:8080");
+            validator.process(exchange);
+            for (String origin : new String[] { "http://localhost:8080@attacker.example",
+                    "http://localhost:8080/path", "http://localhost:8080?query", "http://localhost.evil" }) {
+                exchange.getIn().setHeader("Origin", origin);
+                assertEquals(403, assertThrows(McpProtocolException.class,
+                        () -> validator.process(exchange)).getHttpStatus());
+            }
+        }
+    }
+
+    @Test
+    void preservesWhitespaceInPromptNames() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            String name = " summary ";
+            exchange.getIn().setBody(modernRequest("2026-07-28", "prompts/get", Map.of("name", name)));
+            setRequiredHeaders(exchange, "2026-07-28", "prompts/get");
+            exchange.getIn().setHeader("Mcp-Name", McpHttpValidatorProcessor.encodeHeaderValue(name));
+            new McpHttpValidatorProcessor().process(exchange);
+            exchange.getIn().setHeader("Mcp-Name", "summary");
+            assertThrows(McpProtocolException.class, () -> new McpHttpValidatorProcessor().process(exchange));
+        }
+    }
+
+    @Test
     void acceptsModernRequestWithMatchingMetadataAndHeaders() throws Exception {
         try (DefaultCamelContext context = new DefaultCamelContext()) {
             Exchange exchange = new DefaultExchange(context);
@@ -28,6 +60,49 @@ class McpHttpValidatorProcessorTest {
 
             assertEquals("2026-07-28", exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION));
             assertEquals(Boolean.TRUE, exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_IS_MODERN_PROTOCOL));
+        }
+    }
+
+    @Test
+    void acceptsConfiguredHttpOrigin() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            exchange.getIn().setBody(modernRequest("2026-07-28", "server/discover", Map.of()));
+            setRequiredHeaders(exchange, "2026-07-28", "server/discover");
+            exchange.getIn().setHeader("Origin", "https://agent.example:443");
+
+            new McpHttpValidatorProcessor("https://agent.example").process(exchange);
+
+            assertEquals("2026-07-28", exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION));
+        }
+    }
+
+    @Test
+    void validatesPromptNameAgainstMcpNameHeader() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            exchange.getIn().setBody(modernRequest("2026-07-28", "prompts/get", Map.of("name", "summary")));
+            setRequiredHeaders(exchange, "2026-07-28", "prompts/get");
+            exchange.getIn().setHeader("Mcp-Name", "summary");
+
+            new McpHttpValidatorProcessor().process(exchange);
+
+            assertEquals("2026-07-28", exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION));
+        }
+    }
+
+    @Test
+    void rejectsUnconfiguredHttpOrigin() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            exchange.getIn().setBody(modernRequest("2026-07-28", "server/discover", Map.of()));
+            setRequiredHeaders(exchange, "2026-07-28", "server/discover");
+            exchange.getIn().setHeader("Origin", "https://attacker.example");
+
+            McpProtocolException exception = assertThrows(
+                    McpProtocolException.class, () -> new McpHttpValidatorProcessor().process(exchange));
+
+            assertEquals(403, exception.getHttpStatus());
         }
     }
 
@@ -58,6 +133,26 @@ class McpHttpValidatorProcessorTest {
             new McpHttpValidatorProcessor().process(exchange);
 
             assertEquals("2026-07-28", exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION));
+        }
+    }
+
+    @Test
+    void requiresMcpNameForNameBearingMethods() throws Exception {
+        try (DefaultCamelContext context = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(context);
+            exchange.getIn().setBody(Map.of(
+                    "jsonrpc", "2.0",
+                    "id", "request-1",
+                    "method", "tools/call",
+                    "params", Map.of("_meta", Map.of(
+                            McpHttpValidatorProcessor.META_PROTOCOL_VERSION, "2026-07-28",
+                            McpHttpValidatorProcessor.META_CLIENT_CAPABILITIES, Map.of()))));
+            setRequiredHeaders(exchange, "2026-07-28", "tools/call");
+
+            McpProtocolException exception = assertThrows(
+                    McpProtocolException.class, () -> new McpHttpValidatorProcessor().process(exchange));
+
+            assertEquals(-32602, exception.getCode());
         }
     }
 

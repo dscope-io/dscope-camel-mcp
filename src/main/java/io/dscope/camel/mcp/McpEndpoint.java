@@ -40,12 +40,20 @@ public class McpEndpoint extends DefaultEndpoint {
     private String uri;
 
     @UriParam(label = "producer", defaultValue = "tools/list",
-            description = "The MCP JSON-RPC method to invoke.")
+            description = "The MCP JSON-RPC method to invoke.",
+            enums = "initialize,ping,tools/list,tools/call,resources/list,resources/read,"
+                    + "resources/templates/list,prompts/list,prompts/get,subscriptions/listen,server/discover,events/list,events/subscribe,events/unsubscribe,"
+                    + "resources/get,health,stream,ui/initialize,ui/message,ui/update-model-context,ui/tools/call")
     private String method;
 
     @UriParam(label = "consumer", defaultValue = "false",
             description = "When true the consumer creates a WebSocket endpoint instead of HTTP.")
     private boolean websocket;
+
+    @UriParam(label = "consumer",
+            description = "Comma-separated HTTP Origin allowlist. Requests without an Origin are allowed; "
+                    + "requests with an Origin must match an entry.")
+    private String httpAllowedOrigins;
 
     private final McpConfiguration configuration;
 
@@ -84,4 +92,9 @@ public class McpEndpoint extends DefaultEndpoint {
 
     public boolean isWebsocket() { return configuration.isWebsocket(); }
     public void setWebsocket(boolean websocket) { configuration.setWebsocket(websocket); }
+
+    public String getHttpAllowedOrigins() { return configuration.getHttpAllowedOrigins(); }
+    public void setHttpAllowedOrigins(String httpAllowedOrigins) {
+        configuration.setHttpAllowedOrigins(httpAllowedOrigins);
+    }
 }

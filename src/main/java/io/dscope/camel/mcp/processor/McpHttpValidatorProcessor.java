@@ -1,12 +1,12 @@
 package io.dscope.camel.mcp.processor;
 
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -47,19 +47,14 @@ public class McpHttpValidatorProcessor implements Processor {
     public static final String SUPPORTED_VERSIONS = "mcp.protocol.supportedVersions";
 
     private static final Set<String> SUPPORTED_VERSION_SET = Set.of(DEFAULT_PROTOCOL_VERSION, MODERN_PROTOCOL_VERSION);
-    private final Set<String> allowedOrigins;
+    private final Set<String> allowedHttpOrigins;
 
     public McpHttpValidatorProcessor() {
         this(System.getProperty("mcp.allowedOrigins", "http://localhost,http://127.0.0.1"));
     }
 
-    public McpHttpValidatorProcessor(String allowedOrigins) {
-        this(Arrays.stream((allowedOrigins == null ? "" : allowedOrigins).split(","))
-                .map(String::trim).filter(value -> !value.isEmpty()).collect(java.util.stream.Collectors.toUnmodifiableSet()));
-    }
-
-    McpHttpValidatorProcessor(Collection<String> allowedOrigins) {
-        this.allowedOrigins = Set.copyOf(allowedOrigins);
+    public McpHttpValidatorProcessor(String allowedHttpOrigins) {
+        this.allowedHttpOrigins = parseAllowedOrigins(allowedHttpOrigins);
     }
 
     @Override
@@ -72,6 +67,7 @@ public class McpHttpValidatorProcessor implements Processor {
         String accept = in.getHeader("Accept", String.class);
         String contentType = in.getHeader("Content-Type", String.class);
         try {
+            validateOrigin(in.getHeader("Origin", String.class));
             Map<String, Object> request = readRequest(in);
             Object id = request.get("id");
             if (id != null) {
@@ -92,14 +88,11 @@ public class McpHttpValidatorProcessor implements Processor {
                 throw new IllegalArgumentException("Content-Type must be application/json for MCP requests");
             }
 
-            String origin = normalize(in.getHeader("Origin", String.class)).orElse(null);
-            if (origin != null && !isAllowedOrigin(origin)) {
-                throw new IllegalArgumentException("Origin is not allowed");
-            }
-
             String headerVersion = normalize(in.getHeader("MCP-Protocol-Version", String.class)).orElse(null);
             if (headerVersion != null && !SUPPORTED_VERSION_SET.contains(headerVersion)) {
-                throw new IllegalArgumentException("Unsupported MCP protocol version: " + headerVersion);
+                throw new McpProtocolException(-32022, "Unsupported protocol version", 400,
+                        Map.of("supported", SUPPORTED_VERSION_SET.stream().sorted().toList(),
+                                "requested", headerVersion));
             }
             String bodyVersion = stringValue(meta.get(META_PROTOCOL_VERSION));
             boolean modern = MODERN_PROTOCOL_VERSION.equals(headerVersion) || bodyVersion != null;
@@ -180,15 +173,21 @@ public class McpHttpValidatorProcessor implements Processor {
         }
 
         String name = null;
-        if ("tools/call".equals(method)) {
+        if ("tools/call".equals(method) || "prompts/get".equals(method)) {
             name = identifierValue(params.get("name"));
-        } else if ("resources/read".equals(method) || "prompts/get".equals(method)) {
+        } else if ("resources/read".equals(method)) {
             name = identifierValue(params.get("uri"));
         }
+        if (("tools/call".equals(method) || "resources/read".equals(method) || "prompts/get".equals(method))
+                && name == null) {
+            throw invalidParams("Request params must include a non-empty name or uri for method " + method);
+        }
         if (name != null) {
-            String nameHeader = normalize(message.getHeader("Mcp-Name", String.class)).orElse(null);
+            String nameHeader = message.getHeader("Mcp-Name", String.class);
             String decodedName = decodeHeaderValue(nameHeader);
-            if (!name.equals(decodedName)) {
+            boolean encoded = nameHeader != null && BASE64_SENTINEL.matcher(nameHeader).matches();
+            if (!name.equals(decodedName) || (!encoded
+                    && !java.util.Objects.equals(nameHeader, encodeHeaderValue(nameHeader)))) {
                 throw headerMismatch("Mcp-Name", name, nameHeader);
             }
         }
@@ -215,6 +214,9 @@ public class McpHttpValidatorProcessor implements Processor {
         String encoded = value.substring("=?base64?".length(), value.length() - "?=".length());
         try {
             byte[] bytes = Base64.getDecoder().decode(encoded);
+            if (!Base64.getEncoder().encodeToString(bytes).equals(encoded)) {
+                throw headerMismatch("Mcp-Name", null, value);
+            }
             return StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
@@ -223,6 +225,64 @@ public class McpHttpValidatorProcessor implements Processor {
         } catch (IllegalArgumentException | CharacterCodingException e) {
             throw headerMismatch("Mcp-Name", null, value);
         }
+    }
+
+    private void validateOrigin(String origin) {
+        if (origin == null) {
+            return;
+        }
+        String normalized;
+        try {
+            normalized = normalizeOrigin(origin);
+        } catch (IllegalArgumentException e) {
+            throw invalidOrigin(origin);
+        }
+        if (!allowedHttpOrigins.contains(normalized) && !isAllowedLocalOrigin(normalized)) {
+            throw invalidOrigin(origin);
+        }
+    }
+
+    private Set<String> parseAllowedOrigins(String origins) {
+        if (origins == null || origins.isBlank()) {
+            return Set.of();
+        }
+        return Stream.of(origins.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(McpHttpValidatorProcessor::normalizeOrigin)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private static String normalizeOrigin(String origin) {
+        URI uri;
+        try {
+            uri = URI.create(origin);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid Origin value", e);
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (scheme == null || host == null || uri.getRawUserInfo() != null
+                || uri.getRawQuery() != null || uri.getRawFragment() != null
+                || (uri.getRawPath() != null && !uri.getRawPath().isEmpty())
+                || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+            throw new IllegalArgumentException("Invalid Origin value");
+        }
+
+        int port = uri.getPort();
+        boolean defaultPort = port == -1
+                || ("http".equalsIgnoreCase(scheme) && port == 80)
+                || ("https".equalsIgnoreCase(scheme) && port == 443);
+        return scheme.toLowerCase(Locale.ROOT) + "://" + host.toLowerCase(Locale.ROOT)
+                + (defaultPort ? "" : ":" + port);
+    }
+
+    private McpProtocolException invalidOrigin(String origin) {
+        return new McpProtocolException(
+                -32600,
+                "HTTP request Origin is not allowed",
+                403,
+                Map.of("origin", origin));
     }
 
     private McpProtocolException headerMismatch(String header, String expected, String actual) {
@@ -269,12 +329,11 @@ public class McpHttpValidatorProcessor implements Processor {
         return Optional.of(normalized);
     }
 
-    private boolean isAllowedOrigin(String origin) {
-        if (allowedOrigins.contains(origin)) {
-            return true;
-        }
-        return (allowedOrigins.contains("http://localhost") && origin.startsWith("http://localhost:"))
-                || (allowedOrigins.contains("http://127.0.0.1") && origin.startsWith("http://127.0.0.1:"));
+    private boolean isAllowedLocalOrigin(String origin) {
+        URI uri = URI.create(origin);
+        return "http".equals(uri.getScheme())
+                && ("localhost".equals(uri.getHost()) || "127.0.0.1".equals(uri.getHost()))
+                && allowedHttpOrigins.contains("http://" + uri.getHost());
     }
 
     private boolean containsAllMediaTypes(String header, String... required) {

@@ -84,4 +84,54 @@ class McpJsonRpcEnvelopeProcessorTest {
             assertSame(params, exchange.getIn().getBody());
         }
     }
+
+    @Test
+    void shouldPassThroughModernSubscriptionParams() throws Exception {
+        McpJsonRpcEnvelopeProcessor processor = new McpJsonRpcEnvelopeProcessor();
+        try (DefaultCamelContext ctx = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(ctx);
+            Map<String, Object> params = Map.of("uri", "file:///report");
+            exchange.getIn().setBody(Map.of(
+                    "jsonrpc", "2.0",
+                    "id", "listen-1",
+                    "method", "subscriptions/listen",
+                    "params", params));
+
+            processor.process(exchange);
+
+            assertEquals("subscriptions/listen",
+                    exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD));
+            assertEquals(params, exchange.getIn().getBody());
+        }
+    }
+
+    @Test
+    void exposesModernMrtrRetryFieldsWithoutChangingToolArgumentsBody() throws Exception {
+        McpJsonRpcEnvelopeProcessor processor = new McpJsonRpcEnvelopeProcessor();
+        try (DefaultCamelContext ctx = new DefaultCamelContext()) {
+            Exchange exchange = new DefaultExchange(ctx);
+            Map<String, Object> inputResponses = Map.of("approval", Map.of("action", "accept"));
+            Map<String, Object> params = Map.of(
+                    "name", "deploy",
+                    "arguments", Map.of("environment", "test"),
+                    "inputResponses", inputResponses,
+                    "requestState", "opaque-state",
+                    "_meta", Map.of(
+                            McpHttpValidatorProcessor.META_PROTOCOL_VERSION,
+                            McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION));
+            exchange.getIn().setBody(Map.of(
+                    "jsonrpc", "2.0",
+                    "id", "retry-2",
+                    "method", "tools/call",
+                    "params", params));
+
+            processor.process(exchange);
+
+            assertEquals(Map.of("environment", "test"), exchange.getIn().getBody());
+            assertEquals(inputResponses,
+                    exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_INPUT_RESPONSES));
+            assertEquals("opaque-state",
+                    exchange.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_REQUEST_STATE));
+        }
+    }
 }

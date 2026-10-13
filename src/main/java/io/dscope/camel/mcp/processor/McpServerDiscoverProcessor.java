@@ -17,13 +17,26 @@ public class McpServerDiscoverProcessor extends AbstractMcpResponseProcessor {
             McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION,
             McpHttpValidatorProcessor.DEFAULT_PROTOCOL_VERSION);
 
+    private final boolean eventsEnabled;
+
+    public McpServerDiscoverProcessor() {
+        this(false);
+    }
+
+    /** Explicit capability opt-in, also usable in application platform-http routes. */
+    public McpServerDiscoverProcessor(boolean eventsEnabled) {
+        this.eventsEnabled = eventsEnabled;
+    }
+
     @Override
     protected void handleResponse(Exchange exchange) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("supportedVersions", SUPPORTED_VERSIONS);
-        result.put("capabilities", Map.of(
+        Map<String, Object> capabilities = new LinkedHashMap<>(Map.of(
                 "tools", Map.of(),
                 "resources", Map.of()));
+        if (eventsEnabled) capabilities.put("events", Map.of());
+        result.put("capabilities", capabilities);
         result.put("ttlMs", 3_600_000);
         result.put("cacheScope", "public");
         writeResult(exchange, result);

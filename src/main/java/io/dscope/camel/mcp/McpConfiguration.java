@@ -14,8 +14,10 @@ public class McpConfiguration {
     @UriParam(label = "producer", defaultValue = "tools/list",
             description = "The MCP JSON-RPC method to invoke. "
                     + "Supported: initialize, ping, tools/list, tools/call, resources/list, resources/read, "
-                    + "resources/get, ui/initialize, ui/message, ui/update-model-context, ui/tools/call.",
+                    + "resources/templates/list, prompts/list, prompts/get, subscriptions/listen, "
+                    + "server/discover, events/list, events/subscribe, events/unsubscribe, resources/get, ui/initialize, ui/message, ui/update-model-context, ui/tools/call.",
             enums = "initialize,ping,tools/list,tools/call,resources/list,resources/read,"
+                    + "resources/templates/list,prompts/list,prompts/get,subscriptions/listen,server/discover,events/list,events/subscribe,events/unsubscribe,"
                     + "resources/get,health,stream,ui/initialize,ui/message,ui/update-model-context,ui/tools/call")
     private String method = "tools/list";
 
@@ -34,6 +36,11 @@ public class McpConfiguration {
     @UriParam(label = "consumer", defaultValue = "POST",
             description = "HTTP methods allowed by the consumer endpoint.")
     private String httpMethodRestrict = "POST";
+
+    @UriParam(label = "consumer",
+            description = "Comma-separated HTTP Origin allowlist. Requests without an Origin are allowed; "
+                    + "requests with an Origin must match an entry.")
+    private String httpAllowedOrigins = "";
     
     public String getUri() { return uri; }
     public void setUri(String uri) { this.uri = uri; }
@@ -47,4 +54,6 @@ public class McpConfiguration {
     public void setAllowedOrigins(String allowedOrigins) { this.allowedOrigins = allowedOrigins; }
     public String getHttpMethodRestrict() { return httpMethodRestrict; }
     public void setHttpMethodRestrict(String httpMethodRestrict) { this.httpMethodRestrict = httpMethodRestrict; }
+    public String getHttpAllowedOrigins() { return httpAllowedOrigins; }
+    public void setHttpAllowedOrigins(String httpAllowedOrigins) { this.httpAllowedOrigins = httpAllowedOrigins; }
 }

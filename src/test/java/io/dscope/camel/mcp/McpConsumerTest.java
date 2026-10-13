@@ -9,8 +9,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import io.dscope.camel.mcp.model.McpResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -125,6 +130,79 @@ class McpConsumerTest {
         assertTrue(response.contains("\"2026-07-28\""), response);
         assertTrue(response.contains("\"supportedVersions\""), response);
         assertTrue(response.contains("\"io.modelcontextprotocol/serverInfo\""), response);
+    }
+
+    @Test
+    void modernSubscriptionRouteStreamsServerSentEvents() throws Exception {
+        context.getGlobalOptions().put("mcp.http.protocolVersion", "2026-07-28");
+        context.addRoutes(new RouteBuilder() {
+            @Override
+            public void configure() {
+                from("mcp:http://localhost:9882/mcp")
+                    .process(exchange -> exchange.getMessage().setBody(
+                            new ByteArrayInputStream("data: {\"method\":\"notifications/resources/updated\"}\n\n"
+                                    .getBytes(StandardCharsets.UTF_8))));
+                from("direct:listen")
+                    .to("mcp:http://localhost:9882/mcp?method=subscriptions/listen");
+            }
+        });
+
+        context.start();
+        TimeUnit.MILLISECONDS.sleep(500);
+
+        try (InputStream response = template.requestBody(
+                "direct:listen", Map.of("uri", "file:///report"), InputStream.class)) {
+            assertTrue(new String(response.readAllBytes(), StandardCharsets.UTF_8)
+                    .contains("notifications/resources/updated"));
+        }
+    }
+
+    @Test
+    void modernConsumerDecoratesMcpResponseObjects() throws Exception {
+        context.addRoutes(new RouteBuilder() {
+            @Override
+            public void configure() {
+                from("mcp:http://localhost:9883/mcp")
+                    .process(exchange -> {
+                        McpResponse response = new McpResponse();
+                        response.setJsonrpc("2.0");
+                        response.setId(exchange.getProperty("mcp.jsonrpc.id", String.class));
+                        response.setResult(Map.of("tools", java.util.List.of()));
+                        exchange.getMessage().setBody(response);
+                    });
+            }
+        });
+
+        context.start();
+        TimeUnit.MILLISECONDS.sleep(500);
+
+        String request = """
+            {
+              "jsonrpc": "2.0",
+              "id": "list-1",
+              "method": "tools/list",
+              "params": {
+                "_meta": {
+                  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                  "io.modelcontextprotocol/clientCapabilities": {}
+                }
+              }
+            }
+            """;
+        String response = template.requestBodyAndHeaders(
+                "http://localhost:9883/mcp",
+                request,
+                Map.of(
+                        "CamelHttpMethod", "POST",
+                        "Content-Type", "application/json",
+                        "Accept", "application/json, text/event-stream",
+                        "MCP-Protocol-Version", "2026-07-28",
+                        "Mcp-Method", "tools/list"),
+                String.class);
+
+        assertTrue(response.contains("\"resultType\":\"complete\""), response);
+        assertTrue(response.contains("\"ttlMs\":0"), response);
+        assertTrue(response.contains("\"cacheScope\":\"private\""), response);
     }
 
     @Test

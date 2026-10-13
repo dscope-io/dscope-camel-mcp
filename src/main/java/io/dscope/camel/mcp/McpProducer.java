@@ -1,5 +1,8 @@
 package io.dscope.camel.mcp;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -82,10 +85,10 @@ public class McpProducer extends DefaultProducer {
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Dispatching MCP request id={} method={} targetUri={} paramKeys={} params={}",
-                req.getId(), req.getMethod(), cfg.getUri(), req.getParams().keySet(), previewPayload(req.getParams()));
+                req.getId(), req.getMethod(), cfg.getUri(), req.getParams().keySet(), previewRequest(req));
         }
 
-        McpResponse resp;
+        Object resp;
         try {
             resp = dispatchByUriStructure(cfg.getUri(), req, protocolVersion);
         } catch (Exception e) {
@@ -97,7 +100,7 @@ public class McpProducer extends DefaultProducer {
 
         if (LOG.isDebugEnabled()) {
             long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
-            boolean hasError = resp != null && resp.getError() != null;
+            boolean hasError = resp instanceof McpResponse mcpResponse && mcpResponse.getError() != null;
             LOG.debug("Received MCP response id={} method={} durationMs={} hasError={} response={}",
                 req.getId(), req.getMethod(), durationMs, hasError, previewPayload(resp));
         }
@@ -105,7 +108,7 @@ public class McpProducer extends DefaultProducer {
         exchange.getMessage().setBody(resp);
     }
 
-    private McpResponse dispatchByUriStructure(String targetUri, McpRequest req, String protocolVersion) throws Exception {
+    private Object dispatchByUriStructure(String targetUri, McpRequest req, String protocolVersion) throws Exception {
         // Local Camel route dispatch: mcp:camel:<camel-endpoint>
         // Example: mcp:camel:direct:mcp-service?method=ping
         if (targetUri != null && targetUri.startsWith(LOCAL_URI_PREFIX)) {
@@ -128,12 +131,16 @@ public class McpProducer extends DefaultProducer {
         String json = mapper.writeValueAsString(req);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Remote MCP request payload id={} method={} uri={} payload={}",
-                    req.getId(), req.getMethod(), targetUri, previewText(json));
+                    req.getId(), req.getMethod(), targetUri, previewRequest(req));
         }
         Map<String, Object> transportHeaders = buildRemoteTransportHeaders(req, protocolVersion);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Remote MCP request headers id={} method={} uri={} headers={}",
                 req.getId(), req.getMethod(), targetUri, transportHeaders);
+        }
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)
+                && "subscriptions/listen".equals(req.getMethod())) {
+            return requestEventStream(producerTemplate, targetUri, json, transportHeaders);
         }
         String result = producerTemplate.requestBodyAndHeaders(targetUri, json, transportHeaders, String.class);
         if (LOG.isDebugEnabled()) {
@@ -177,6 +184,38 @@ public class McpProducer extends DefaultProducer {
         McpResponse response = mapper.readValue(data.toString(), McpResponse.class);
         return requestId.equals(response.getId()) && (response.getResult() != null || response.getError() != null)
                 ? response : null;
+    }
+
+    private InputStream requestEventStream(
+            ProducerTemplate template, String targetUri, String requestBody, Map<String, Object> headers) {
+        Exchange response = template.request(targetUri, exchange -> {
+            exchange.getIn().setBody(requestBody);
+            headers.forEach(exchange.getIn()::setHeader);
+        });
+        if (response.getException() != null) {
+            throw new IllegalStateException("MCP subscriptions/listen request failed", response.getException());
+        }
+        Integer status = response.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class);
+        if (status != null && (status < 200 || status >= 300)) {
+            throw new IllegalStateException("MCP subscriptions/listen returned HTTP status " + status);
+        }
+        String contentType = response.getMessage().getHeader(Exchange.CONTENT_TYPE, String.class);
+        if (contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT).startsWith("text/event-stream")) {
+            throw new IllegalStateException(
+                    "MCP subscriptions/listen response must use Content-Type text/event-stream");
+        }
+
+        Object body = response.getMessage().getBody();
+        if (body instanceof InputStream stream) {
+            return stream;
+        }
+        if (body instanceof byte[] bytes) {
+            return new ByteArrayInputStream(bytes);
+        }
+        if (body instanceof String text) {
+            return new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8));
+        }
+        throw new IllegalStateException("MCP subscriptions/listen returned no stream body");
     }
 
     private McpResponse toMcpResponse(Object responseBody) {
@@ -253,9 +292,8 @@ public class McpProducer extends DefaultProducer {
         if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)) {
             headers.put("Mcp-Method", request.getMethod());
             String name = switch (request.getMethod()) {
-                case "tools/call" -> String.valueOf(request.getParams().get("name"));
+                case "tools/call", "prompts/get" -> String.valueOf(request.getParams().get("name"));
                 case "resources/read" -> String.valueOf(request.getParams().get("uri"));
-                case "prompts/get" -> String.valueOf(request.getParams().get("name"));
                 default -> null;
             };
             if (name != null && !"null".equals(name)) {
@@ -278,6 +316,12 @@ public class McpProducer extends DefaultProducer {
         }
 
         return null;
+    }
+
+    private String previewRequest(McpRequest request) {
+        // Events subscriptions carry webhook signing secrets in delivery.secret.
+        return request.getMethod().startsWith("events/")
+                ? "<event request payload omitted>" : previewPayload(request.getParams());
     }
 
     private String previewPayload(Object payload) {
