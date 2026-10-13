@@ -1,5 +1,8 @@
 package io.dscope.camel.mcp;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -68,7 +71,7 @@ public class McpProducer extends DefaultProducer {
                 req.getId(), req.getMethod(), cfg.getUri(), req.getParams().keySet(), previewPayload(req.getParams()));
         }
 
-        McpResponse resp;
+        Object resp;
         try {
             resp = dispatchByUriStructure(cfg.getUri(), req, protocolVersion);
         } catch (Exception e) {
@@ -80,7 +83,7 @@ public class McpProducer extends DefaultProducer {
 
         if (LOG.isDebugEnabled()) {
             long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
-            boolean hasError = resp != null && resp.getError() != null;
+            boolean hasError = resp instanceof McpResponse mcpResponse && mcpResponse.getError() != null;
             LOG.debug("Received MCP response id={} method={} durationMs={} hasError={} response={}",
                 req.getId(), req.getMethod(), durationMs, hasError, previewPayload(resp));
         }
@@ -88,7 +91,7 @@ public class McpProducer extends DefaultProducer {
         exchange.getMessage().setBody(resp);
     }
 
-    private McpResponse dispatchByUriStructure(String targetUri, McpRequest req, String protocolVersion) throws Exception {
+    private Object dispatchByUriStructure(String targetUri, McpRequest req, String protocolVersion) throws Exception {
         // Local Camel route dispatch: mcp:camel:<camel-endpoint>
         // Example: mcp:camel:direct:mcp-service?method=ping
         if (targetUri != null && targetUri.startsWith(LOCAL_URI_PREFIX)) {
@@ -121,12 +124,48 @@ public class McpProducer extends DefaultProducer {
                 req.getId(), req.getMethod(), targetUri, transportHeaders);
         }
         ProducerTemplate template = endpoint.getCamelContext().createProducerTemplate();
+        if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)
+                && "subscriptions/listen".equals(req.getMethod())) {
+            return requestEventStream(template, targetUri, json, transportHeaders);
+        }
         String result = template.requestBodyAndHeaders(targetUri, json, transportHeaders, String.class);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Remote MCP response payload id={} method={} uri={} payload={}",
                     req.getId(), req.getMethod(), targetUri, previewText(result));
         }
         return mapper.readValue(result, McpResponse.class);
+    }
+
+    private InputStream requestEventStream(
+            ProducerTemplate template, String targetUri, String requestBody, Map<String, Object> headers) {
+        Exchange response = template.request(targetUri, exchange -> {
+            exchange.getIn().setBody(requestBody);
+            headers.forEach(exchange.getIn()::setHeader);
+        });
+        if (response.getException() != null) {
+            throw new IllegalStateException("MCP subscriptions/listen request failed", response.getException());
+        }
+        Integer status = response.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class);
+        if (status != null && (status < 200 || status >= 300)) {
+            throw new IllegalStateException("MCP subscriptions/listen returned HTTP status " + status);
+        }
+        String contentType = response.getMessage().getHeader(Exchange.CONTENT_TYPE, String.class);
+        if (contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT).startsWith("text/event-stream")) {
+            throw new IllegalStateException(
+                    "MCP subscriptions/listen response must use Content-Type text/event-stream");
+        }
+
+        Object body = response.getMessage().getBody();
+        if (body instanceof InputStream stream) {
+            return stream;
+        }
+        if (body instanceof byte[] bytes) {
+            return new ByteArrayInputStream(bytes);
+        }
+        if (body instanceof String text) {
+            return new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8));
+        }
+        throw new IllegalStateException("MCP subscriptions/listen returned no stream body");
     }
 
     private McpResponse toMcpResponse(Object responseBody) {
@@ -203,8 +242,8 @@ public class McpProducer extends DefaultProducer {
         if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)) {
             headers.put("Mcp-Method", request.getMethod());
             String name = switch (request.getMethod()) {
-                case "tools/call" -> String.valueOf(request.getParams().get("name"));
-                case "resources/read", "prompts/get" -> String.valueOf(request.getParams().get("uri"));
+                case "tools/call", "prompts/get" -> String.valueOf(request.getParams().get("name"));
+                case "resources/read" -> String.valueOf(request.getParams().get("uri"));
                 default -> null;
             };
             if (name != null && !"null".equals(name)) {

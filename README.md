@@ -16,7 +16,7 @@ _Note: These values mirror the GitHub repository settings (Description, Topics, 
 | Channel | Version | Maven Coordinate | Notes |
 | --- | --- | --- | --- |
 | Latest Release | 1.5.0 | `io.dscope.camel:camel-mcp:1.5.0` | Recommended for production use |
-| Development Snapshot | 1.5.0 | `io.dscope.camel:camel-mcp:1.5.0` | Build from source (`mvn install`) to track `main` |
+| Local build | 1.5.0 | `io.dscope.camel:camel-mcp:1.5.0` | Build from source (`mvn install`); includes reusable MCP Events webhooks |
 
 Maven Central:
 - https://central.sonatype.com/artifact/io.dscope.camel/camel-mcp
@@ -34,6 +34,7 @@ Maven Central:
 - **Consumer (server) mode**: Expose MCP endpoints with `from("mcp:http://0.0.0.0:3000/mcp")` — built-in request validation, JSON-RPC parsing, rate limiting, and response serialization.
 - Implements core MCP methods: `initialize`, `ping`, `resources/list`, `resources/read`, `resources/get`, `tools/list`, `tools/call`, `health`, and `stream`.
 - **MCP Apps Bridge support**: `ui/initialize`, `ui/message`, `ui/update-model-context`, and `ui/tools/call` for embedded UI integration.
+- **MCP Events (2026-07-28)**: Application provider SPI and optional discovery, signed callback verification and delivery with public-address pinning. See [Events API](docs/mcp-events.md).
 - **Notifications**: `notifications/initialized`, `notifications/cancelled`, `notifications/progress`.
 - HTTP and WebSocket transports for both producer and consumer modes.
 - Ships 20+ registry processors for JSON-RPC envelopes, tool catalogs, resource catalogs, and notification workflows.

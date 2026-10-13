@@ -32,6 +32,8 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
     public static final String EXCHANGE_PROPERTY_TOOL_NAME = "mcp.tool.name";
     public static final String EXCHANGE_PROPERTY_NOTIFICATION_TYPE = "mcp.notification.type";
     public static final String EXCHANGE_PROPERTY_NOTIFICATION_PARAMS = "mcp.notification.params";
+    public static final String EXCHANGE_PROPERTY_INPUT_RESPONSES = "mcp.jsonrpc.inputResponses";
+    public static final String EXCHANGE_PROPERTY_REQUEST_STATE = "mcp.jsonrpc.requestState";
 
     private enum MessageType {
         REQUEST,
@@ -120,16 +122,39 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
                         McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(version));
             }
         }
+        if (McpProtocolSupport.isModernProtocol(exchange)) {
+            Object inputResponses = params.get("inputResponses");
+            if (params.containsKey("inputResponses") && !(inputResponses instanceof Map<?, ?>)) {
+                throw new IllegalArgumentException("params.inputResponses must be an object");
+            }
+            if (params.containsKey("requestState") && !(params.get("requestState") instanceof String)) {
+                throw new IllegalArgumentException("params.requestState must be a string");
+            }
+            if (inputResponses instanceof Map<?, ?> responses) {
+                exchange.setProperty(EXCHANGE_PROPERTY_INPUT_RESPONSES, responses);
+            }
+            if (params.containsKey("requestState")) {
+                exchange.setProperty(EXCHANGE_PROPERTY_REQUEST_STATE, params.get("requestState"));
+            }
+        }
 
         switch (method) {
             case "initialize" -> handleInitialize(exchange, params);
             case "ping" -> handlePing(exchange, params);
             case "server/discover" -> handleServerDiscover(exchange, params);
+            case "events/list", "events/subscribe", "events/unsubscribe" -> {
+                if (!McpProtocolSupport.isModernProtocol(exchange)) {
+                    throw new McpProtocolException(-32601, "Events require protocol 2026-07-28", 404, Map.of());
+                }
+                exchange.getIn().setBody(params);
+            }
             case "resources/list" -> handleResourcesList(exchange, params);
             case "resources/read" -> handleResourcesRead(exchange, params);
             case "resources/get" -> handleResourcesGet(exchange, params);
             case "tools/list" -> handleToolsList(exchange, params);
             case "tools/call" -> handleToolsCall(exchange, params);
+            case "resources/templates/list", "prompts/list", "prompts/get", "subscriptions/listen" ->
+                    exchange.getIn().setBody(params == null ? Map.of() : params);
             case "health" -> handleHealth(exchange, params);
             case "stream" -> handleStream(exchange, params);
             // MCP Apps Bridge methods

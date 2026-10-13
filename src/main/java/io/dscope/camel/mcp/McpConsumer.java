@@ -1,5 +1,6 @@
 package io.dscope.camel.mcp;
 
+import java.io.InputStream;
 import org.apache.camel.Processor;
 import org.apache.camel.Exchange;
 import org.apache.camel.component.undertow.UndertowConsumer;
@@ -8,6 +9,7 @@ import org.apache.camel.support.DefaultConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,6 +23,9 @@ import io.dscope.camel.mcp.processor.McpProtocolException;
 import io.dscope.camel.mcp.processor.McpProtocolSupport;
 import io.dscope.camel.mcp.processor.McpServerDiscoverProcessor;
 import io.dscope.camel.mcp.processor.McpHttpValidatorProcessor;
+import io.dscope.camel.mcp.model.McpResponse;
+import io.dscope.camel.mcp.events.McpEventsProvider;
+import io.dscope.camel.mcp.processor.McpEventsProcessor;
 
 /**
  * Camel consumer-side implementation for MCP server calls.
@@ -35,17 +40,21 @@ public class McpConsumer extends DefaultConsumer {
     private static final int JSON_RPC_INTERNAL_ERROR = -32603;
     private static final Set<String> MODERN_SUPPORTED_METHODS = Set.of(
             "server/discover",
+            "events/list", "events/subscribe", "events/unsubscribe",
             "tools/list",
             "tools/call",
             "resources/list",
-            "resources/read");
+            "resources/read",
+            "resources/templates/list",
+            "prompts/list",
+            "prompts/get",
+            "subscriptions/listen");
     
     private final McpEndpoint endpoint;
     private final McpRequestSizeGuardProcessor requestSizeGuard;
     private final McpRateLimitProcessor rateLimit;
     private final McpJsonRpcEnvelopeProcessor jsonRpcEnvelope;
     private final McpHttpValidatorProcessor httpValidator;
-    private final McpServerDiscoverProcessor serverDiscover;
     private final ObjectMapper objectMapper;
     private UndertowConsumer undertowConsumer;
     
@@ -55,8 +64,7 @@ public class McpConsumer extends DefaultConsumer {
         this.requestSizeGuard = new McpRequestSizeGuardProcessor();
         this.rateLimit = new McpRateLimitProcessor();
         this.jsonRpcEnvelope = new McpJsonRpcEnvelopeProcessor();
-        this.httpValidator = new McpHttpValidatorProcessor();
-        this.serverDiscover = new McpServerDiscoverProcessor();
+        this.httpValidator = new McpHttpValidatorProcessor(endpoint.getConfiguration().getHttpAllowedOrigins());
         this.objectMapper = new ObjectMapper();
     }
     
@@ -112,8 +120,12 @@ public class McpConsumer extends DefaultConsumer {
                 }
                 
                 // Discovery is a protocol-level method and is handled by the component.
+                McpEventsProvider eventsProvider = ("server/discover".equals(method)
+                        || (method != null && method.startsWith("events/"))) ? eventsProvider() : null;
                 if ("server/discover".equals(method)) {
-                    serverDiscover.process(exchange);
+                    new McpServerDiscoverProcessor(eventsProvider != null).process(exchange);
+                } else if (method != null && method.startsWith("events/") && eventsProvider != null) {
+                    new McpEventsProcessor(eventsProvider).process(exchange);
                 } else {
                     getProcessor().process(exchange);
                     decorateModernResponse(exchange);
@@ -121,7 +133,19 @@ public class McpConsumer extends DefaultConsumer {
 
                 // 5) Serialize non-string response payloads to JSON.
                 Object body = exchange.getMessage().getBody();
-                if (body != null && !(body instanceof String) && !(body instanceof byte[])) {
+                boolean modernSubscription = McpProtocolSupport.isModernProtocol(exchange)
+                        && "subscriptions/listen".equals(method);
+                if (modernSubscription) {
+                    if (!(body instanceof InputStream) && !(body instanceof byte[]) && !(body instanceof String)) {
+                        throw new IllegalStateException(
+                                "subscriptions/listen route must return an SSE string, byte array, or InputStream");
+                    }
+                    exchange.getMessage().setHeader(Exchange.CONTENT_TYPE, "text/event-stream");
+                    exchange.getMessage().setHeader("Cache-Control", "no-store");
+                    exchange.getMessage().setHeader("X-Accel-Buffering", "no");
+                }
+                if (body != null && !(body instanceof String) && !(body instanceof byte[])
+                        && !(body instanceof InputStream)) {
                     try {
                         String json = objectMapper.writeValueAsString(body);
                         exchange.getMessage().setBody(json);
@@ -194,6 +218,12 @@ public class McpConsumer extends DefaultConsumer {
         undertowConsumer.start();
         
         LOG.info("MCP consumer started successfully on {}", undertowUri);
+    }
+
+    private McpEventsProvider eventsProvider() {
+        var providers = endpoint.getCamelContext().getRegistry().findByType(McpEventsProvider.class);
+        if (providers.size() > 1) throw new IllegalStateException("Register exactly one McpEventsProvider");
+        return providers.stream().findFirst().orElse(null);
     }
     
     @Override
@@ -296,6 +326,9 @@ public class McpConsumer extends DefaultConsumer {
         }
         Object responseBody = exchange.getMessage().getBody();
         if (responseBody instanceof Map<?, ?> responseMap) {
+            exchange.getMessage().setBody(McpProtocolSupport.decorateJsonRpcResponse(exchange, responseMap));
+        } else if (responseBody instanceof McpResponse response) {
+            Map<String, Object> responseMap = objectMapper.convertValue(response, new TypeReference<>() { });
             exchange.getMessage().setBody(McpProtocolSupport.decorateJsonRpcResponse(exchange, responseMap));
         } else if (responseBody instanceof String text && text.stripLeading().startsWith("{")) {
             Map<String, Object> serializedResponse = objectMapper.readValue(text, Map.class);

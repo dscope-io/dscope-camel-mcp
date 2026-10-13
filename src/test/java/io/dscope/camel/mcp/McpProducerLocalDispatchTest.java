@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 public class McpProducerLocalDispatchTest {
 
@@ -66,6 +67,32 @@ public class McpProducerLocalDispatchTest {
             Map<String, Object> result = (Map<String, Object>) response.getResult();
             assertEquals("tools/list", result.get("method"));
             assertEquals(1, result.get("count"));
+        }
+    }
+
+    @Test
+    public void shouldPassThroughModernInputResponses() throws Exception {
+        AtomicReference<McpRequest> seenRequest = new AtomicReference<>();
+        try (CamelContext context = createContextForMcpResponse(seenRequest)) {
+            context.getGlobalOptions().put("mcp.http.protocolVersion", "2026-07-28");
+            context.start();
+            ProducerTemplate template = context.createProducerTemplate();
+
+            template.requestBody(
+                    "mcp:camel:direct:local-mcp?method=tools/call",
+                    Map.of(
+                            "name", "lookup",
+                            "inputResponses", Map.of("approval", true),
+                            "requestState", "opaque-server-state"),
+                    McpResponse.class);
+
+            McpRequest request = seenRequest.get();
+            assertNotNull(request);
+            assertEquals("2026-07-28",
+                    assertInstanceOf(Map.class, request.getParams().get("_meta"))
+                            .get("io.modelcontextprotocol/protocolVersion"));
+            assertEquals(Map.of("approval", true), request.getParams().get("inputResponses"));
+            assertEquals("opaque-server-state", request.getParams().get("requestState"));
         }
     }
 
