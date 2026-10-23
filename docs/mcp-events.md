@@ -92,6 +92,17 @@ Transport's `post(URI, InetAddress[], Map<String,String>, byte[])` returns
 the supplied pinned addresses and never follow redirects. The production defaults
 perform validation independently of the test transport.
 
+Reusable provider support is available without requiring a persistence backend:
+`McpWebhookDeliveryPolicy` classifies receipts (2xx has no failure reason;
+410/413 are terminal), bounds backoff with jitter, and exposes an explicit attempt
+limit. `McpCallbackVerificationCache` supplies bounded challenge caching with an
+injectable clock/lifetime. Its digest key binds principal, URL and signing secret;
+none is retained as plaintext, and failed verification is not cached. Clear it
+on shutdown. These helpers never replace live authorization or per-delivery
+destination validation/pinning. The MCP artifact does not require JDBC; providers
+can compose it with optional `camel-persistence-events-jdbc:1.4.0` storage.
+MCP remains version `1.5.0`.
+
 The application owns canonical argument comparison and deterministic subscription
 IDs from principal/URL/name/arguments, persistent owner/filter/secret/expiration
 storage, idempotent refresh and unsubscribe, verification caching, revocation checks,

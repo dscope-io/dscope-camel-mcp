@@ -79,20 +79,14 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
                                 exchange.setProperty(EXCHANGE_PROPERTY_ID, idValue);
                             }
                             if (LOG.isDebugEnabled()) {
-                                LOG.debug("Parsed JSON-RPC response id={} hasResult={} hasError={}",
-                                        idValue, payload.containsKey("result"), payload.containsKey("error"));
+                                LOG.debug("Parsed JSON-RPC response hasResult={} hasError={}",payload.containsKey("result"),payload.containsKey("error"));
                             }
                         } else {
                             throw new IllegalArgumentException("JSON-RPC payload must contain method, result or error");
                         }
                     });
         } catch (IllegalArgumentException e) {
-            LOG.error("Invalid JSON-RPC payload bodyType={} method={} id={} reason={}",
-                    exchange.getProperty("mcp.jsonrpc.bodyType", String.class),
-                    exchange.getProperty(EXCHANGE_PROPERTY_METHOD),
-                    exchange.getProperty(EXCHANGE_PROPERTY_ID),
-                    e.getMessage(),
-                    e);
+            LOG.error("Invalid JSON-RPC payload reason={}",io.dscope.camel.mcp.McpDiagnostics.failureSummary(e));
             throw e;
         }
     }
@@ -107,8 +101,7 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
 
         if (LOG.isDebugEnabled()) {
             Object rawParams = payload.get("params");
-            LOG.debug("Parsed JSON-RPC {} method={} id={} hasParams={}",
-                    type.name(), method, idValue, rawParams != null);
+            LOG.debug("Parsed JSON-RPC {} hasParams={}",type.name(),rawParams!=null);
         }
 
         Map<String, Object> params = Optional.ofNullable(asMap(payload.get("params"), "params"))
@@ -330,16 +323,15 @@ public class McpJsonRpcEnvelopeProcessor implements Processor {
             }
             return OBJECT_MAPPER.readValue(json, MAP_TYPE_REFERENCE);
         } catch (IOException e) {
-            LOG.error("Unable to parse JSON-RPC payload bodyType={} bodyPreview={}",
+            LOG.error("Unable to parse JSON-RPC payload bodyType={} reason={}",
                     exchange.getProperty("mcp.jsonrpc.bodyType", String.class),
-                    previewBodyText(exchange.getProperty("mcp.jsonrpc.bodyText", String.class)),
-                    e);
-            throw new IllegalArgumentException("Unable to parse JSON-RPC payload", e);
+                    io.dscope.camel.mcp.McpDiagnostics.failureSummary(e));
+            throw new IllegalArgumentException("Unable to parse JSON-RPC payload");
         } catch (TypeConversionException e) {
-            LOG.error("Unable to convert JSON-RPC payload to text bodyType={}",
+            LOG.error("Unable to convert JSON-RPC payload to text bodyType={} reason={}",
                     exchange.getProperty("mcp.jsonrpc.bodyType", String.class),
-                    e);
-            throw new IllegalArgumentException("Unable to convert JSON-RPC payload to text", e);
+                    io.dscope.camel.mcp.McpDiagnostics.failureSummary(e));
+            throw new IllegalArgumentException("Unable to convert JSON-RPC payload to text");
         }
     }
 
