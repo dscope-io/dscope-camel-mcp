@@ -49,7 +49,7 @@ Maven Central:
 
 - Java 21+
 - Maven 3.9+
-- Apache Camel 4.22.0+
+- Apache Camel 4.22.0+; this source build manages Camel 4.23.0 and Jackson 2.22.3.
 
 ## 🚀 Features
 
@@ -791,3 +791,15 @@ src/main/docs/mcp-component.adoc      # AsciiDoc component documentation for Cam
 ## 📄 License
 
 Licensed under the Apache License 2.0. See `LICENSE` for the full text.
+
+## Current source dependencies and verification
+
+The current POM coordinates are camel-mcp 1.5.0, Apache Camel 4.23.0, and
+Jackson 2.22.3. These describe this working tree; local changes are not a new
+publication. The MCP component has no required Camel Persistence dependency.
+Applications may add Persistence core and one backend separately when they
+need durable agent state.
+
+Run the complete reactor test and local install from the repository root:
+
+    mvn -B -ntp clean install
