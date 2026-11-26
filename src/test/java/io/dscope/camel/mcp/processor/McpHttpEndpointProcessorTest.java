@@ -118,6 +118,31 @@ class McpHttpEndpointProcessorTest {
         assertTrue(rpc(request(extension,invalid,true)).containsKey("error"));
         assertEquals(1,extension.calls);
     }
+    @Test void supportedNotificationExtensionsRunWithoutWritingAResponse() throws Exception {
+        var extension=new Provider(){
+            int calls;
+            @Override public boolean supportsExtension(String method){return method.equals("ui/notifications/tool-input");}
+            @Override public Map<String,Object> extension(Exchange e,Map<String,Object> request){
+                calls++;
+                return Map.of("jsonrpc","2.0","id",1,"result",Map.of("custom",true));
+            }
+        };
+        for(String id:List.of("",",\"id\":null")) {
+            var response=request(extension,"{\"jsonrpc\":\"2.0\""+id+",\"method\":\"ui/notifications/tool-input\",\"params\":{}}",false);
+            assertEquals(202,response.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));
+            assertEquals("",response.getMessage().getBody());
+        }
+        assertEquals(2,extension.calls);
+    }
+    @Test void rejectsNonObjectMetadataBeforeProviderDispatch() throws Exception {
+        var provider=new Provider();
+        for(String meta:List.of("[]","\"invalid\"")) {
+            String body="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"example.read\",\"_meta\":"+meta+"}}";
+            Map<?,?> response=rpc(request(provider,body,false));
+            assertEquals(-32602,((Map<?,?>)response.get("error")).get("code"));
+        }
+        assertEquals(0,provider.calls);
+    }
     @Test void initializeAdvertisesOnlyProviderSupportedCapabilities() throws Exception {
         var provider=new Provider();
         Map<?,?> response=rpc(request(provider,"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}",false));

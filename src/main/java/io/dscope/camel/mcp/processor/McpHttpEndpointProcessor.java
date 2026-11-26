@@ -46,6 +46,7 @@ public final class McpHttpEndpointProcessor implements Processor {
             validateCommonEnvelope(exchange,request,params,id,candidateMethod);
             exchange.getMessage().setBody(params);
             if(id==null) {
+                if(provider.supportsExtension(candidateMethod))provider.extension(exchange,request);
                 exchange.getMessage().setBody("");exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE,202);return;
             }
             String method=(String)request.get("method");
@@ -94,6 +95,9 @@ public final class McpHttpEndpointProcessor implements Processor {
     }
     private void validateCommonEnvelope(Exchange exchange,Map<String,Object> request,Map<String,Object> params,
         Object id,String method) {
+        Object meta=params.get("_meta");
+        if(meta!=null && !(meta instanceof Map<?,?>))
+            throw new IllegalArgumentException("params._meta must be an object");
         exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_RAW_MESSAGE,request);
         exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD,method);
         exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE,id==null?"NOTIFICATION":"REQUEST");
