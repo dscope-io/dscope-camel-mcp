@@ -124,6 +124,8 @@ class McpHttpEndpointProcessorTest {
             @Override public boolean supportsExtension(String method){return method.equals("ui/notifications/tool-input");}
             @Override public Map<String,Object> extension(Exchange e,Map<String,Object> request){
                 calls++;
+                if(request.get("params") instanceof Map<?,?> params && Boolean.TRUE.equals(params.get("fail")))
+                    throw new IllegalStateException("private notification failure");
                 return Map.of("jsonrpc","2.0","id",1,"result",Map.of("custom",true));
             }
         };
@@ -132,7 +134,11 @@ class McpHttpEndpointProcessorTest {
             assertEquals(202,response.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));
             assertEquals("",response.getMessage().getBody());
         }
-        assertEquals(2,extension.calls);
+        var failed=request(extension,"{\"jsonrpc\":\"2.0\",\"method\":\"ui/notifications/tool-input\",\"params\":{\"fail\":true}}",false);
+        assertEquals(202,failed.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));
+        assertEquals("",failed.getMessage().getBody());
+        assertFalse(failed.getMessage().getBody(String.class).contains("private notification failure"));
+        assertEquals(3,extension.calls);
     }
     @Test void rejectsNonObjectMetadataBeforeProviderDispatch() throws Exception {
         var provider=new Provider();

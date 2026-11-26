@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Reusable JSON-RPC HTTP orchestration. Authenticate upstream; the provider authorizes every tool. */
 public final class McpHttpEndpointProcessor implements Processor {
     private static final ObjectMapper JSON=new ObjectMapper();
+    private static final Logger LOG=LoggerFactory.getLogger(McpHttpEndpointProcessor.class);
     public interface Provider {
         List<Map<String,Object>> tools(Exchange exchange) throws Exception;
         boolean authorize(Exchange exchange,String name,Map<String,Object> arguments) throws Exception;
@@ -46,7 +49,12 @@ public final class McpHttpEndpointProcessor implements Processor {
             validateCommonEnvelope(exchange,request,params,id,candidateMethod);
             exchange.getMessage().setBody(params);
             if(id==null) {
-                if(provider.supportsExtension(candidateMethod))provider.extension(exchange,request);
+                if(provider.supportsExtension(candidateMethod)) {
+                    try {provider.extension(exchange,request);}
+                    catch(Exception failure) {
+                        LOG.warn("MCP notification extension failed reason={}",io.dscope.camel.mcp.McpDiagnostics.failureSummary(failure));
+                    }
+                }
                 exchange.getMessage().setBody("");exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE,202);return;
             }
             String method=(String)request.get("method");
