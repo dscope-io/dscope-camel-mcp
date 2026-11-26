@@ -19,11 +19,22 @@ class McpHttpEndpointProcessorTest {
         }
     }
     private Exchange request(Provider provider,String body,boolean modern) throws Exception {
+        return request(provider,body,modern,"",null,null);
+    }
+    private Exchange request(Provider provider,String body,boolean modern,String allowedOrigins,String origin,String protocolVersion) throws Exception {
         var context=new DefaultCamelContext();var e=new DefaultExchange(context);e.getMessage().setBody(body);
         e.getMessage().setHeader(Exchange.HTTP_METHOD,"POST");
         e.getMessage().setHeader("Content-Type","application/json");e.getMessage().setHeader("Accept","application/json, text/event-stream");
-        if(modern) {e.getMessage().setHeader("MCP-Protocol-Version","2026-07-28");e.getMessage().setHeader("Mcp-Method","tools/call");e.getMessage().setHeader("Mcp-Name","example.read");}
-        new McpHttpEndpointProcessor("",provider).process(e);return e;
+        if(modern) {
+            Map<?,?> rpc=json.readValue(body,Map.class);
+            e.getMessage().setHeader("MCP-Protocol-Version","2026-07-28");
+            e.getMessage().setHeader("Mcp-Method",rpc.get("method"));
+            Object params=rpc.get("params");
+            if(params instanceof Map<?,?> map && map.get("name") instanceof String name)e.getMessage().setHeader("Mcp-Name",name);
+        }
+        if(origin!=null)e.getMessage().setHeader("Origin",origin);
+        if(protocolVersion!=null)e.getMessage().setHeader("MCP-Protocol-Version",protocolVersion);
+        new McpHttpEndpointProcessor(allowedOrigins,provider).process(e);return e;
     }
     private Map<?,?> rpc(Exchange e) throws Exception{return json.readValue(e.getMessage().getBody(String.class),Map.class);}
     private String call(Map<String,Object> arguments,boolean modern) throws Exception {
@@ -33,10 +44,14 @@ class McpHttpEndpointProcessorTest {
     }
     @Test void invokesAuthorizedProviderAndDecoratesModernResponses() throws Exception {
         for(boolean modern:new boolean[]{false,true}) {
-            var provider=new Provider();Map<?,?> response=rpc(request(provider,call(Map.of("recipient","a"),modern),modern));
+            var provider=new Provider();var exchange=request(provider,call(Map.of("recipient","a"),modern),modern);
+            Map<?,?> response=rpc(exchange);
             assertEquals(42,response.get("id"));Map<?,?> result=(Map<?,?>)response.get("result");
             assertEquals(Map.of("recipient","a"),result.get("structuredContent"));assertEquals(1,provider.calls);
             assertEquals(modern,result.containsKey("resultType"));
+            assertEquals(modern?"2026-07-28":McpHttpValidatorProcessor.DEFAULT_PROTOCOL_VERSION,
+                exchange.getMessage().getHeader("MCP-Protocol-Version"));
+            assertEquals("no-store",exchange.getMessage().getHeader("Cache-Control"));
         }
     }
     @Test void deniedRecipientsAndNotificationsNeverInvokeTools() throws Exception {
@@ -45,6 +60,17 @@ class McpHttpEndpointProcessorTest {
         assertEquals(403,denied.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));assertEquals(-32003,((Map<?,?>)rpc(denied).get("error")).get("code"));
         var notification=request(provider,"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",false);
         assertEquals(202,notification.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));assertEquals("",notification.getMessage().getBody());assertEquals(0,provider.calls);
+    }
+    @Test void validatesLegacyTransportAndRejectsNullIdToolNotifications() throws Exception {
+        var provider=new Provider();
+        var deniedOrigin=request(provider,call(Map.of(),false),false,"","https://untrusted.example",null);
+        assertEquals(403,deniedOrigin.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));
+        var unsupportedVersion=request(provider,call(Map.of(),false),false,"",null,"2099-01-01");
+        assertEquals(400,unsupportedVersion.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));
+        var notification=request(provider,"{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"tools/call\",\"params\":{\"name\":\"example.read\"}}",false);
+        assertEquals(202,notification.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE));
+        assertEquals("",notification.getMessage().getBody());
+        assertEquals(0,provider.calls);
     }
     @Test void rejectsMalformedEnvelopesAndArguments() throws Exception {
         var provider=new Provider();
@@ -65,12 +91,43 @@ class McpHttpEndpointProcessorTest {
             assertEquals("same-id",response.get("id"));assertTrue(response.containsKey("result"));
         }
         var extension=new Provider(){
+            int calls;
             @Override public boolean supportsExtension(String method){return method.equals("server/discover");}
             @Override public Map<String,Object> extension(Exchange e,Map<String,Object> request){
+                calls++;
+                assertEquals("server/discover",e.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD));
+                assertEquals("REQUEST",e.getProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE));
                 return Map.of("jsonrpc","2.0","id",request.get("id"),"result",Map.of("capabilities",Map.of("events",Map.of())));
             }
         };
         assertTrue(rpc(request(extension,"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"server/discover\"}",false)).containsKey("result"));
-        assertEquals(0,provider.calls);assertEquals(0,extension.calls);
+        assertEquals(0,provider.calls);assertEquals(1,extension.calls);
+    }
+    @Test void supportedExtensionsRunOnlyAfterCommonValidation() throws Exception {
+        var extension=new Provider(){
+            int calls;
+            @Override public boolean supportsExtension(String method){return method.equals("example/extension");}
+            @Override public Map<String,Object> extension(Exchange e,Map<String,Object> request){
+                calls++;
+                return Map.of("jsonrpc","2.0","id",request.get("id"),"result",Map.of("custom",true));
+            }
+        };
+        String valid="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"example/extension\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}";
+        assertTrue(rpc(request(extension,valid,true)).containsKey("result"));
+        String invalid="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"example/extension\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\"}}}";
+        assertTrue(rpc(request(extension,invalid,true)).containsKey("error"));
+        assertEquals(1,extension.calls);
+    }
+    @Test void initializeAdvertisesOnlyProviderSupportedCapabilities() throws Exception {
+        var provider=new Provider();
+        Map<?,?> response=rpc(request(provider,"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}",false));
+        Map<?,?> result=(Map<?,?>)response.get("result");
+        assertEquals(Map.of("tools",Map.of()),result.get("capabilities"));
+        var extendedProvider=new Provider(){
+            @Override public boolean supportsExtension(String method){return method.equals("resources/list") || method.equals("resources/read");}
+        };
+        Map<?,?> extendedResponse=rpc(request(extendedProvider,"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}",false));
+        Map<?,?> extendedResult=(Map<?,?>)extendedResponse.get("result");
+        assertEquals(Map.of("tools",Map.of(),"resources",Map.of()),extendedResult.get("capabilities"));
     }
 }

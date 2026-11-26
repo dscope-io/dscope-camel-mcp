@@ -41,12 +41,11 @@ public final class McpHttpEndpointProcessor implements Processor {
         }
         try {
             Map<String,Object> params=rawParams instanceof Map<?,?> map?copy(map):Map.of();
-            boolean modern="2026-07-28".equals(exchange.getMessage().getHeader("MCP-Protocol-Version",String.class))
-                || params.get("_meta") instanceof Map<?,?> meta && meta.containsKey("io.modelcontextprotocol/protocolVersion");
             exchange.getMessage().setBody(request);
-            if(modern)new McpHttpValidatorProcessor(allowedOrigins).process(exchange);
-            new McpJsonRpcEnvelopeProcessor().process(exchange);
-            if(!request.containsKey("id")) {
+            new McpHttpValidatorProcessor(allowedOrigins).process(exchange);
+            validateCommonEnvelope(exchange,request,params,id,candidateMethod);
+            exchange.getMessage().setBody(params);
+            if(id==null) {
                 exchange.getMessage().setBody("");exchange.getMessage().setHeader(Exchange.HTTP_RESPONSE_CODE,202);return;
             }
             String method=(String)request.get("method");
@@ -54,7 +53,11 @@ public final class McpHttpEndpointProcessor implements Processor {
             switch(method) {
                 case "initialize" -> {
                     new McpInitializeProcessor().process(exchange);
-                    respond(exchange,copy(JSON.readValue(exchange.getMessage().getBody(String.class),Map.class)));
+                    Map<String,Object> response=copy(JSON.readValue(exchange.getMessage().getBody(String.class),Map.class));
+                    Map<String,Object> result=copy((Map<?,?>)response.get("result"));
+                    result.put("capabilities",providerCapabilities());
+                    response.put("result",result);
+                    respond(exchange,response);
                 }
                 case "ping" -> result(exchange,id,Map.of());
                 case "tools/list" -> result(exchange,id,Map.of("tools",provider.tools(exchange)));
@@ -89,6 +92,45 @@ public final class McpHttpEndpointProcessor implements Processor {
             error(exchange,id,-32603,"MCP service unavailable");
         }
     }
+    private void validateCommonEnvelope(Exchange exchange,Map<String,Object> request,Map<String,Object> params,
+        Object id,String method) {
+        exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_RAW_MESSAGE,request);
+        exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_METHOD,method);
+        exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_TYPE,id==null?"NOTIFICATION":"REQUEST");
+        if(id!=null)exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_ID,id);
+        if(McpProtocolSupport.isModernProtocol(exchange)) {
+            Object inputResponses=params.get("inputResponses");
+            if(params.containsKey("inputResponses") && !(inputResponses instanceof Map<?,?>))
+                throw new IllegalArgumentException("params.inputResponses must be an object");
+            if(params.containsKey("requestState") && !(params.get("requestState") instanceof String))
+                throw new IllegalArgumentException("params.requestState must be a string");
+            if(inputResponses instanceof Map<?,?> responses)
+                exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_INPUT_RESPONSES,responses);
+            if(params.containsKey("requestState"))
+                exchange.setProperty(McpJsonRpcEnvelopeProcessor.EXCHANGE_PROPERTY_REQUEST_STATE,params.get("requestState"));
+        }
+    }
+    private Map<String,Object> providerCapabilities() {
+        Map<String,Object> capabilities=new LinkedHashMap<>();
+        capabilities.put("tools",Map.of());
+        if(provider.supportsExtension("resources/list") && provider.supportsExtension("resources/read"))
+            capabilities.put("resources",Map.of());
+        if(provider.supportsExtension("prompts/list") && provider.supportsExtension("prompts/get"))
+            capabilities.put("prompts",Map.of());
+        if(provider.supportsExtension("logging/setLevel"))capabilities.put("logging",Map.of());
+        Map<String,Object> apps=new LinkedHashMap<>();
+        Map<String,String> appMethods=Map.of(
+            "ui/initialize","ui/initialize",
+            "ui/message","ui/message",
+            "ui/update-model-context","ui/update-model-context",
+            "ui/notifications/tool-input","ui/notifications/tool-input",
+            "ui/notifications/tool-result","ui/notifications/tool-result");
+        appMethods.forEach((capability,method)->{
+            if(provider.supportsExtension(method))apps.put(capability,Boolean.TRUE);
+        });
+        if(!apps.isEmpty())capabilities.put("experimental",Map.of("camelMcpApps",apps));
+        return capabilities;
+    }
     private static Map<String,Object> copy(Map<?,?> source) {
         Map<String,Object> result=new LinkedHashMap<>();source.forEach((key,value)->result.put(String.valueOf(key),value));return result;
     }
@@ -107,6 +149,10 @@ public final class McpHttpEndpointProcessor implements Processor {
     }
     public static void writeResponse(Exchange exchange,Map<String,Object> response) throws Exception {
         exchange.getMessage().setHeader(Exchange.CONTENT_TYPE,"application/json");
+        String protocolVersion=exchange.getProperty(McpHttpValidatorProcessor.EXCHANGE_PROTOCOL_VERSION,String.class);
+        exchange.getMessage().setHeader("MCP-Protocol-Version",
+            protocolVersion==null?McpHttpValidatorProcessor.DEFAULT_PROTOCOL_VERSION:protocolVersion);
+        exchange.getMessage().setHeader("Cache-Control","no-store");
         exchange.getMessage().setBody(JSON.writeValueAsString(McpProtocolSupport.decorateJsonRpcResponse(exchange,response)));
     }
 }
