@@ -34,7 +34,6 @@ public class McpProducer extends DefaultProducer {
     private static final String LOCAL_URI_PREFIX = "camel:";
     private static final String MCP_ACCEPT = "application/json, text/event-stream";
     private static final String JSON_CONTENT_TYPE = "application/json";
-    private static final int PAYLOAD_PREVIEW_LIMIT = 4000;
 
     private final McpEndpoint endpoint;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -84,8 +83,7 @@ public class McpProducer extends DefaultProducer {
         req.setParams(params);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Dispatching MCP request id={} method={} targetUri={} paramKeys={} params={}",
-                req.getId(), req.getMethod(), cfg.getUri(), req.getParams().keySet(), previewRequest(req));
+            LOG.debug("Dispatching MCP request id={}",req.getId());
         }
 
         Object resp;
@@ -93,16 +91,14 @@ public class McpProducer extends DefaultProducer {
             resp = dispatchByUriStructure(cfg.getUri(), req, protocolVersion);
         } catch (Exception e) {
             long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
-            LOG.error("MCP request failed id={} method={} targetUri={} durationMs={}",
-                    req.getId(), req.getMethod(), cfg.getUri(), durationMs, e);
+            LOG.error("MCP request failed id={} durationMs={} reason={}",req.getId(),durationMs,McpDiagnostics.failureSummary(e));
             throw e;
         }
 
         if (LOG.isDebugEnabled()) {
             long durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
             boolean hasError = resp instanceof McpResponse mcpResponse && mcpResponse.getError() != null;
-            LOG.debug("Received MCP response id={} method={} durationMs={} hasError={} response={}",
-                req.getId(), req.getMethod(), durationMs, hasError, previewPayload(resp));
+            LOG.debug("Received MCP response id={} durationMs={} hasError={}",req.getId(),durationMs,hasError);
         }
 
         exchange.getMessage().setBody(resp);
@@ -114,29 +110,26 @@ public class McpProducer extends DefaultProducer {
         if (targetUri != null && targetUri.startsWith(LOCAL_URI_PREFIX)) {
             String localUri = targetUri.substring(LOCAL_URI_PREFIX.length());
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Using local MCP dispatch id={} method={} localUri={}", req.getId(), req.getMethod(), localUri);
+                LOG.debug("Using local MCP dispatch id={}",req.getId());
             }
             Object localResponse = producerTemplate.requestBody(localUri, req, Object.class);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Local MCP response id={} method={} localUri={} payload={}",
-                        req.getId(), req.getMethod(), localUri, previewPayload(localResponse));
+                LOG.debug("Local MCP response id={}",req.getId());
             }
-            return toMcpResponse(localResponse);
+            return toMcpResponse(localResponse,req.getId());
         }
 
         // Remote transport dispatch (HTTP/WebSocket/etc) keeps JSON string wire format.
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Using remote MCP dispatch id={} method={} uri={}", req.getId(), req.getMethod(), targetUri);
+            LOG.debug("Using remote MCP dispatch id={}",req.getId());
         }
         String json = mapper.writeValueAsString(req);
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Remote MCP request payload id={} method={} uri={} payload={}",
-                    req.getId(), req.getMethod(), targetUri, previewRequest(req));
+            LOG.debug("Remote MCP request encoded id={}",req.getId());
         }
         Map<String, Object> transportHeaders = buildRemoteTransportHeaders(req, protocolVersion);
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Remote MCP request headers id={} method={} uri={} headers={}",
-                req.getId(), req.getMethod(), targetUri, transportHeaders);
+            LOG.debug("Remote MCP transport headers prepared id={}",req.getId());
         }
         if (McpHttpValidatorProcessor.MODERN_PROTOCOL_VERSION.equals(protocolVersion)
                 && "subscriptions/listen".equals(req.getMethod())) {
@@ -144,16 +137,15 @@ public class McpProducer extends DefaultProducer {
         }
         String result = producerTemplate.requestBodyAndHeaders(targetUri, json, transportHeaders, String.class);
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Remote MCP response payload id={} method={} uri={} payload={}",
-                    req.getId(), req.getMethod(), targetUri, previewText(result));
+            LOG.debug("Remote MCP response received id={}",req.getId());
         }
         return parseRemoteResponse(result, req.getId());
     }
 
     private McpResponse parseRemoteResponse(String body, String requestId) throws JsonProcessingException {
         String trimmed = body == null ? "" : body.trim();
-        if (trimmed.startsWith("{")) {
-            return mapper.readValue(trimmed, McpResponse.class);
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            return toMcpResponse(trimmed,requestId);
         }
         StringBuilder data = new StringBuilder();
         for (String line : trimmed.split("\\R", -1)) {
@@ -218,36 +210,27 @@ public class McpProducer extends DefaultProducer {
         throw new IllegalStateException("MCP subscriptions/listen returned no stream body");
     }
 
-    private McpResponse toMcpResponse(Object responseBody) {
-        if (responseBody == null) {
-            LOG.error("MCP local dispatch returned null response body");
-            throw new IllegalStateException("MCP response body is null");
-        }
-        if (responseBody instanceof McpResponse mcpResponse) {
-            return mcpResponse;
-        }
-        if (responseBody instanceof String json) {
-            try {
-                return mapper.readValue(json, McpResponse.class);
-            } catch (JsonProcessingException e) {
-                LOG.error("Failed to parse local MCP response JSON size={}B", json.length(), e);
-                throw new IllegalStateException("Failed to parse local MCP response JSON", e);
-            }
-        }
-        if (responseBody instanceof Map<?, ?> map) {
-            try {
-                return mapper.convertValue(map, McpResponse.class);
-            } catch (IllegalArgumentException e) {
-                LOG.error("Failed to convert local MCP response map keys={} to McpResponse", map.keySet(), e);
-                throw e;
-            }
-        }
+    private McpResponse toMcpResponse(Object body,String requestId) {
+        if(body==null)throw new IllegalStateException("MCP response body is null");
+        if(body instanceof McpResponse response)return response;
         try {
-            return mapper.convertValue(responseBody, McpResponse.class);
-        } catch (IllegalArgumentException e) {
-            LOG.error("Failed to convert local MCP response type={} to McpResponse",
-                    responseBody.getClass().getName(), e);
-            throw e;
+            com.fasterxml.jackson.databind.JsonNode node;
+            if(body instanceof com.fasterxml.jackson.databind.JsonNode json)node=json;
+            else if(body instanceof String json)node=mapper.readTree(json);
+            else if(body instanceof Map<?,?> || body instanceof java.util.List<?>)node=mapper.valueToTree(body);
+            else {
+                String json=endpoint.getCamelContext().getTypeConverter().tryConvertTo(String.class,body);
+                if(json==null)throw new IllegalArgumentException("Unsupported MCP response type");
+                node=mapper.readTree(json);
+            }
+            if(node!=null&&node.isObject()&&(node.has("result")||node.has("error")))
+                return mapper.treeToValue(node,McpResponse.class);
+            // Compatibility for local legacy tools returning a bare JSON value.
+            McpResponse response=new McpResponse();response.setJsonrpc("2.0");response.setId(requestId);
+            response.setResult(node==null?mapper.nullNode():node);return response;
+        } catch(Exception invalid) {
+            // Jackson exceptions can contain source payloads; do not retain them as causes.
+            throw new IllegalStateException("Failed to decode MCP response: "+McpDiagnostics.failureSummary(invalid));
         }
     }
 
@@ -318,33 +301,4 @@ public class McpProducer extends DefaultProducer {
         return null;
     }
 
-    private String previewRequest(McpRequest request) {
-        // Events subscriptions carry webhook signing secrets in delivery.secret.
-        return request.getMethod().startsWith("events/")
-                ? "<event request payload omitted>" : previewPayload(request.getParams());
-    }
-
-    private String previewPayload(Object payload) {
-        if (payload == null) {
-            return "<null>";
-        }
-        try {
-            if (payload instanceof String text) {
-                return previewText(text);
-            }
-            return previewText(mapper.writeValueAsString(payload));
-        } catch (JsonProcessingException | RuntimeException e) {
-            return "<unserializable:" + payload.getClass().getName() + ">";
-        }
-    }
-
-    private String previewText(String text) {
-        if (text == null) {
-            return "<null>";
-        }
-        if (text.length() <= PAYLOAD_PREVIEW_LIMIT) {
-            return text;
-        }
-        return text.substring(0, PAYLOAD_PREVIEW_LIMIT) + "...<truncated " + (text.length() - PAYLOAD_PREVIEW_LIMIT) + " chars>";
-    }
 }

@@ -126,12 +126,10 @@ public class McpHttpValidatorProcessor implements Processor {
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Validated HTTP MCP headers protocolVersion={} accept={} contentType={}",
-                        protocolVersion, accept, contentType);
+                LOG.debug("Validated HTTP MCP transport protocolVersion={}",protocolVersion);
             }
         } catch (IllegalArgumentException e) {
-            LOG.error("Invalid HTTP MCP headers accept={} contentType={} reason={}",
-                    accept, contentType, e.getMessage());
+            LOG.error("Invalid HTTP MCP headers reason={}",io.dscope.camel.mcp.McpDiagnostics.failureSummary(e));
             throw e;
         }
     }
